@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item -Force \"C:\\\\Users\\\\Rodrigo Centeno\\\\Documents\\\\Claude\\\\Scrumban\\\\database\\\\schema.sql\" \"C:\\\\Users\\\\Rodrigo Centeno\\\\Documents\\\\Claude\\\\Scrumban\\\\database\\\\seed.sql\" \"C:\\\\Users\\\\Rodrigo Centeno\\\\Documents\\\\Claude\\\\Scrumban\\\\database\\\\migrations\\\\001_unit_superviewer_checklist.sql\" \"C:\\\\Users\\\\Rodrigo Centeno\\\\Documents\\\\Claude\\\\Scrumban\\\\database\\\\migrations\\\\002_units_table.sql\")",
+      "Bash(Remove-Item -Force \"C:\\\\Users\\\\Rodrigo Centeno\\\\Documents\\\\Claude\\\\Scrumban\\\\database\\\\migrations\")",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\Rodrigo Centeno\\\\Documents\\\\Claude\\\\Scrumban\\\\database\")",
+      "Bash(rm -f '/mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/database/schema.sql' '/mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/database/seed.sql' '/mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/database/migrations/001_unit_superviewer_checklist.sql' '/mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/database/migrations/002_units_table.sql')",
+      "Bash(rmdir \"/mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/database/migrations\")",
+      "Read(//mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/**)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('./src/config/logger'\\); console.log\\('logger OK'\\)\")",
+      "Bash(git -C \"C:\\\\Users\\\\ING IVAN ALVARADO\\\\Documents\\\\Sistemas\\\\Scrumban\\\\Scrumban\" log --oneline -10)"
+    ]
+  }
+}
