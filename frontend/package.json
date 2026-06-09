@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx vite build",
-    "preview": "npx vite preview --host 0.0.0.0 --port ${PORT:-4173}"
+    "build": "node node_modules/vite/bin/vite.js build",
+    "preview": "node node_modules/vite/bin/vite.js preview --host 0.0.0.0 --port ${PORT:-4173}"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
