@@ -227,11 +227,12 @@ export default function Users() {
 
 export function UserForm({ user, units = [], onSave, onCancel }) {
   const [form, setForm] = useState({
-    name:     user?.name  || '',
-    email:    user?.email || '',
-    password: '',
-    role:     user?.role  || 'member',
-    unit:     user?.unit  || '',
+    name:       user?.name       || '',
+    email:      user?.email      || '',
+    password:   '',
+    role:       user?.role       || 'member',
+    unit:       user?.unit       || '',
+    sgc_access: user?.sgc_access || false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -301,6 +302,22 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
           </div>
         )}
       </div>
+      {/* Acceso SGC — solo visible para roles que no son admin ni superViewer (ellos siempre tienen acceso) */}
+      {form.role !== 'admin' && form.role !== 'superViewer' && (
+        <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+          <input
+            type="checkbox"
+            id="sgc_access"
+            checked={!!form.sgc_access}
+            onChange={e => setForm({ ...form, sgc_access: e.target.checked })}
+            className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+          />
+          <label htmlFor="sgc_access" className="text-sm font-medium text-amber-800 dark:text-amber-300 cursor-pointer select-none">
+            Acceso al SGC (Sistema de Gestión de Calidad)
+          </label>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-1">
         <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
         <button type="submit" disabled={saving} className="btn-primary flex-1">

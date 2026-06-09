@@ -26,6 +26,7 @@ export default function Sidebar({ open, onClose }) {
   const isTeamVisible  = ['admin', 'coordinator', 'superViewer'].includes(user?.role);
   const isAdminVisible = user?.role === 'admin';
   const isSuperViewer  = user?.role === 'superViewer';
+  const hasSGCAccess   = user?.sgc_access && !isAdminVisible && !isSuperViewer;
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -98,7 +99,7 @@ export default function Sidebar({ open, onClose }) {
             </>
           )}
 
-          {isSuperViewer && (
+          {(isSuperViewer || hasSGCAccess) && (
             <>
               <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2 mt-4">
                 Supervisión

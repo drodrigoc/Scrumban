@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
     }
 
     const [users] = await db.query(
-      'SELECT id, name, email, password, role, is_active, avatar FROM users WHERE email = ?',
+      'SELECT id, name, email, password, role, sgc_access, is_active, avatar FROM users WHERE email = ?',
       [email.toLowerCase().trim()]
     );
 
@@ -51,7 +51,7 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const [users] = await db.query(
-      'SELECT id, name, email, role, is_active, avatar, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, sgc_access, is_active, avatar, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
     res.json(users[0]);

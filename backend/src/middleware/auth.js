@@ -12,7 +12,7 @@ const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const [users] = await db.query(
-      'SELECT id, name, email, role, is_active, avatar, unit FROM users WHERE id = ?',
+      'SELECT id, name, email, role, sgc_access, is_active, avatar, unit FROM users WHERE id = ?',
       [decoded.userId]
     );
 
@@ -67,4 +67,11 @@ const denyProjectViewer = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticate, authorize, denyProjectViewer };
+// Permite acceso a SGC si es admin, superViewer, o tiene sgc_access = true
+const authorizeSGC = (req, res, next) => {
+  const { role, sgc_access } = req.user;
+  if (role === 'admin' || role === 'superViewer' || sgc_access) return next();
+  return res.status(403).json({ message: 'No tienes permisos para acceder al SGC' });
+};
+
+module.exports = { authenticate, authorize, denyProjectViewer, authorizeSGC };

@@ -5,7 +5,7 @@ const db = require('../config/database');
 exports.getAll = async (req, res) => {
   try {
     const [users] = await db.query(
-      'SELECT id, name, email, role, unit, is_active, avatar, created_at FROM users ORDER BY name'
+      'SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at FROM users ORDER BY name'
     );
     res.json(users);
   } catch (error) {
@@ -17,7 +17,7 @@ exports.getAll = async (req, res) => {
 exports.getById = async (req, res) => {
   try {
     const [users] = await db.query(
-      'SELECT id, name, email, role, unit, is_active, avatar, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at FROM users WHERE id = ?',
       [req.params.id]
     );
     if (!users.length) return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -66,7 +66,7 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { name, email, role, unit, is_active, avatar } = req.body;
+    const { name, email, role, unit, is_active, avatar, sgc_access } = req.body;
     const { id } = req.params;
 
     if (req.user.role !== 'admin' && req.user.id !== parseInt(id)) {
@@ -82,8 +82,9 @@ exports.update = async (req, res) => {
     if (unit !== undefined)   { fields.push('unit = ?');   values.push(unit || null); }
 
     if (req.user.role === 'admin') {
-      if (role)                  { fields.push('role = ?');      values.push(role); }
-      if (is_active !== undefined) { fields.push('is_active = ?'); values.push(is_active); }
+      if (role)                     { fields.push('role = ?');       values.push(role); }
+      if (is_active !== undefined)  { fields.push('is_active = ?');  values.push(is_active); }
+      if (sgc_access !== undefined) { fields.push('sgc_access = ?'); values.push(sgc_access ? 1 : 0); }
     }
 
     if (!fields.length) return res.status(400).json({ message: 'No hay campos para actualizar' });
@@ -92,7 +93,7 @@ exports.update = async (req, res) => {
     await db.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 
     const [updated] = await db.query(
-      'SELECT id, name, email, role, unit, is_active, avatar FROM users WHERE id = ?',
+      'SELECT id, name, email, role, sgc_access, unit, is_active, avatar FROM users WHERE id = ?',
       [id]
     );
     res.json(updated[0]);
