@@ -26,7 +26,7 @@ export default function Sidebar({ open, onClose }) {
   const isTeamVisible  = ['admin', 'coordinator', 'superViewer'].includes(user?.role);
   const isAdminVisible = user?.role === 'admin';
   const isSuperViewer  = user?.role === 'superViewer';
-  const hasSGCAccess   = user?.sgc_access && !isAdminVisible && !isSuperViewer;
+  const hasSGCAccess   = !!user?.sgc_access && !isAdminVisible && !isSuperViewer;
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
