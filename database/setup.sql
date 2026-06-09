@@ -1,5 +1,5 @@
 -- ============================================================
---  Scrumban — Script de instalación unificado
+--  Scrumban — Script de instalación (DESARROLLO LOCAL)
 -- ============================================================
 --  Descripción : Crea la base de datos completa con todas las
 --                tablas, índices y el usuario administrador.
