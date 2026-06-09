@@ -80,15 +80,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Credenciales de acceso inicial */}
-          <div className="mt-6 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Acceso inicial:</p>
-            <button type="button"
-              onClick={() => setForm({ email: 'admin@projectflow.com', password: 'Admin1234' })}
-              className="w-full text-left text-xs text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-              <span className="font-medium">Admin:</span> admin@projectflow.com / Admin1234
-            </button>
-          </div>
         </div>
       </div>
     </div>
