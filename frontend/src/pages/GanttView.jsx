@@ -5,29 +5,42 @@ import { tasksAPI, projectsAPI } from '../services/api';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import ViewNavBar from '../components/common/ViewNavBar';
 import {
-  addWeeks, subWeeks, startOfWeek, eachDayOfInterval, format,
-  differenceInDays, parseISO, addDays, isBefore, isAfter
+  addWeeks, subWeeks, startOfWeek, format,
+  differenceInDays, parseISO, isBefore, isAfter
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const priorityColors = {
   low: '#6B7280', medium: '#3B82F6', high: '#F59E0B', critical: '#EF4444',
 };
-const statusBgLight = {
-  pending: '#E5E7EB', in_progress: '#BFDBFE', in_review: '#FDE68A', completed: '#BBF7D0',
-};
-const statusBgDark = {
-  pending: '#374151', in_progress: '#1E3A5F', in_review: '#4D3800', completed: '#14532D',
-};
+
+// Paleta base (misma que CalendarView para consistencia visual)
+const COL_PALETTE = [
+  '#6B7280','#3B82F6','#F59E0B','#10B981',
+  '#8B5CF6','#EC4899','#14B8A6','#F97316','#06B6D4','#84CC16',
+];
+
+const DEFAULT_COLUMNS = [
+  { id: 'pending',     label: 'Pendiente'   },
+  { id: 'in_progress', label: 'En proceso'  },
+  { id: 'in_review',   label: 'En revisión' },
+  { id: 'completed',   label: 'Completada'  },
+];
+
+// Convierte color hex a versión light/dark con opacidad
+function hexWithAlpha(hex, alpha) {
+  return hex + Math.round(alpha * 255).toString(16).padStart(2, '0');
+}
 
 export default function GanttView() {
   const { id: projectId } = useParams();
-  const [tasks, setTasks] = useState([]);
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [viewStart, setViewStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [tasks,      setTasks]      = useState([]);
+  const [project,    setProject]    = useState(null);
+  const [columns,    setColumns]    = useState(DEFAULT_COLUMNS);
+  const [loading,    setLoading]    = useState(true);
+  const [viewStart,  setViewStart]  = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [weeksCount, setWeeksCount] = useState(8);
-  const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
+  const [isDark,     setIsDark]     = useState(document.documentElement.classList.contains('dark'));
 
   // Sync with dark mode changes
   useEffect(() => {
@@ -39,6 +52,12 @@ export default function GanttView() {
   }, []);
 
   useEffect(() => {
+    // Cargar columnas del proyecto desde localStorage
+    const saved = localStorage.getItem(`kanban_columns_${projectId}`);
+    if (saved) {
+      try { setColumns(JSON.parse(saved)); } catch { /* usa DEFAULT_COLUMNS */ }
+    }
+
     Promise.all([tasksAPI.getByProject(projectId), projectsAPI.getById(projectId)])
       .then(([t, p]) => {
         const sorted = t.data
@@ -53,6 +72,11 @@ export default function GanttView() {
   const viewEnd = addWeeks(viewStart, weeksCount);
   const totalDays = differenceInDays(viewEnd, viewStart);
 
+  // Mapa { statusId → color base } derivado de columnas del proyecto
+  const colorMap = useMemo(() =>
+    Object.fromEntries(columns.map((col, i) => [col.id, COL_PALETTE[i % COL_PALETTE.length]])),
+  [columns]);
+
   const weeks = useMemo(() => {
     return Array.from({ length: weeksCount }, (_, i) => {
       const start = addWeeks(viewStart, i);
@@ -62,23 +86,29 @@ export default function GanttView() {
 
   const getBarStyle = (task) => {
     const start = task.start_date ? parseISO(task.start_date) : (task.due_date ? parseISO(task.due_date) : null);
-    const end = task.due_date ? parseISO(task.due_date) : start;
+    const end   = task.due_date   ? parseISO(task.due_date)   : start;
     if (!start || !end) return null;
 
     const clampedStart = isBefore(start, viewStart) ? viewStart : start;
-    const clampedEnd = isAfter(end, viewEnd) ? viewEnd : end;
+    const clampedEnd   = isAfter(end,   viewEnd)    ? viewEnd   : end;
     if (isBefore(clampedEnd, viewStart) || isAfter(clampedStart, viewEnd)) return null;
 
-    const offsetDays = Math.max(0, differenceInDays(clampedStart, viewStart));
+    const offsetDays   = Math.max(0, differenceInDays(clampedStart, viewStart));
     const durationDays = Math.max(1, differenceInDays(clampedEnd, clampedStart) + 1);
-
-    const left = (offsetDays / totalDays) * 100;
+    const left  = (offsetDays   / totalDays) * 100;
     const width = (durationDays / totalDays) * 100;
 
     const isOverdue = isBefore(end, new Date()) && task.status !== 'completed';
-    const statusBg = isDark ? statusBgDark : statusBgLight;
-    const bg = isOverdue ? (isDark ? '#4C1A1A' : '#FCA5A5') : statusBg[task.status] || statusBg.pending;
-    const border = isOverdue ? '#EF4444' : priorityColors[task.priority];
+
+    let bg, border;
+    if (isOverdue) {
+      bg     = isDark ? '#4C1A1A' : '#FCA5A5';
+      border = '#EF4444';
+    } else {
+      const baseColor = colorMap[task.status] ?? '#6B7280';
+      bg     = hexWithAlpha(baseColor, isDark ? 0.25 : 0.18);
+      border = priorityColors[task.priority] ?? '#6B7280';
+    }
 
     return { left: `${left}%`, width: `${Math.max(width, 1)}%`, bg, border };
   };
@@ -112,15 +142,22 @@ export default function GanttView() {
         </select>
       </div>
 
-      {/* Leyenda */}
+      {/* Leyenda dinámica */}
       <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-        {Object.entries({ pending: 'Pendiente', in_progress: 'En proceso', in_review: 'En revisión', completed: 'Completada' }).map(([k, v]) => (
-          <span key={k} className="flex items-center gap-1">
-            <div className="w-4 h-3 rounded-sm border dark:border-gray-600"
-              style={{ backgroundColor: (isDark ? statusBgDark : statusBgLight)[k] }} /> {v}
-          </span>
-        ))}
-        <span className="flex items-center gap-1 text-red-500"><AlertTriangle className="w-3 h-3" /> Vencida</span>
+        {columns.map((col, i) => {
+          const baseColor = COL_PALETTE[i % COL_PALETTE.length];
+          const bg = hexWithAlpha(baseColor, isDark ? 0.25 : 0.18);
+          return (
+            <span key={col.id} className="flex items-center gap-1">
+              <div className="w-4 h-3 rounded-sm border"
+                style={{ backgroundColor: bg, borderColor: baseColor }} />
+              {col.label}
+            </span>
+          );
+        })}
+        <span className="flex items-center gap-1 text-red-500">
+          <AlertTriangle className="w-3 h-3" /> Vencida
+        </span>
       </div>
 
       {tasks.length === 0 ? (

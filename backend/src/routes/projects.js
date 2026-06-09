@@ -11,6 +11,7 @@ router.put('/:id', ctrl.update);
 router.delete('/:id', ctrl.delete);
 
 router.post('/:id/members', ctrl.addMember);
+router.patch('/:id/members/:userId/role', ctrl.updateMemberRole);
 router.delete('/:id/members/:userId', ctrl.removeMember);
 
 router.get('/:id/labels', ctrl.getLabels);

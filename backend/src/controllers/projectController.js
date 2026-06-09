@@ -6,7 +6,7 @@ exports.getAll = async (req, res) => {
     let query;
     let params = [];
 
-    if (req.user.role === 'admin') {
+    if (['admin', 'superViewer'].includes(req.user.role)) {
       query = `
         SELECT p.*, u.name as owner_name,
           COUNT(DISTINCT t.id) as total_tasks,
@@ -68,7 +68,7 @@ exports.getById = async (req, res) => {
     const project = projects[0];
 
     // Verificar acceso
-    if (req.user.role !== 'admin' && project.owner_id !== req.user.id) {
+    if (!['admin', 'superViewer'].includes(req.user.role) && project.owner_id !== req.user.id) {
       const [membership] = await db.query(
         'SELECT id FROM project_members WHERE project_id = ? AND user_id = ?',
         [req.params.id, req.user.id]
@@ -89,7 +89,13 @@ exports.getById = async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ ...project, members, taskStats });
+    // Total de costos de tareas
+    const [costResult] = await db.query(
+      `SELECT COALESCE(SUM(costo), 0) as total_costo FROM tasks WHERE project_id = ? AND costo IS NOT NULL`,
+      [req.params.id]
+    );
+
+    res.json({ ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo) });
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al obtener proyecto' });
@@ -98,14 +104,14 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, description, objectives, start_date, end_date, status, color, members } = req.body;
+    const { name, description, objectives, start_date, end_date, status, color, members, presupuesto } = req.body;
 
     if (!name) return res.status(400).json({ message: 'El nombre es requerido' });
 
     const [result] = await db.query(
-      `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, description, objectives, start_date, end_date, status || 'active', color || '#3B82F6', req.user.id]
+      `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id, presupuesto)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, description, objectives, start_date, end_date, status || 'active', color || '#3B82F6', req.user.id, presupuesto || null]
     );
 
     const projectId = result.insertId;
@@ -127,7 +133,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, objectives, start_date, end_date, status, color } = req.body;
+    const { name, description, objectives, start_date, end_date, status, color, presupuesto } = req.body;
 
     const fields = [];
     const values = [];
@@ -139,6 +145,7 @@ exports.update = async (req, res) => {
     if (end_date) { fields.push('end_date = ?'); values.push(end_date); }
     if (status) { fields.push('status = ?'); values.push(status); }
     if (color) { fields.push('color = ?'); values.push(color); }
+    if (presupuesto !== undefined) { fields.push('presupuesto = ?'); values.push(presupuesto || null); }
 
     if (!fields.length) return res.status(400).json({ message: 'Sin campos para actualizar' });
 
@@ -193,6 +200,44 @@ exports.addMember = async (req, res) => {
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al agregar miembro' });
+  }
+};
+
+exports.updateMemberRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    const { id, userId } = req.params;
+
+    const allowed = ['coordinator', 'member', 'viewer'];
+    if (!allowed.includes(role)) {
+      return res.status(400).json({ message: 'Rol no válido' });
+    }
+
+    // Solo puede cambiar roles: admin, coordinador global, dueño del proyecto
+    // o quien tenga project_role = coordinator en este proyecto
+    if (!['admin', 'coordinator'].includes(req.user.role)) {
+      const [proj] = await db.query('SELECT owner_id FROM projects WHERE id = ?', [id]);
+      if (!proj.length) return res.status(404).json({ message: 'Proyecto no encontrado' });
+
+      if (proj[0].owner_id !== req.user.id) {
+        const [membership] = await db.query(
+          'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
+          [id, req.user.id]
+        );
+        if (!membership.length || membership[0].role !== 'coordinator') {
+          return res.status(403).json({ message: 'Sin permisos para cambiar roles' });
+        }
+      }
+    }
+
+    await db.query(
+      'UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?',
+      [role, id, userId]
+    );
+    res.json({ message: 'Rol actualizado' });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al actualizar rol' });
   }
 };
 

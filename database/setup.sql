@@ -1,5 +1,5 @@
 -- ============================================================
---  ProjectFlow — Script de instalación unificado
+--  Scrumban — Script de instalación unificado
 -- ============================================================
 --  Descripción : Crea la base de datos completa con todas las
 --                tablas, índices y el usuario administrador.
@@ -14,7 +14,7 @@
 --
 --  Ejecución
 --  ─────────
---    mysql -u root -p < setup.sql
+--    mysql -u root -p < database/setup.sql
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -29,21 +29,26 @@ USE project_manager;
 
 -- ------------------------------------------------------------
 -- 1. Usuarios
+--    Roles del sistema:
+--      admin       → acceso total
+--      coordinator → gestiona proyectos asignados
+--      member      → trabaja en proyectos asignados
+--      superViewer → lectura global + SGC (sin editar)
 -- ------------------------------------------------------------
 CREATE TABLE users (
   id                  INT PRIMARY KEY AUTO_INCREMENT,
   name                VARCHAR(255) NOT NULL,
   email               VARCHAR(255) UNIQUE NOT NULL,
   password            VARCHAR(255) NOT NULL,
-  avatar              VARCHAR(500)       DEFAULT NULL,
-  unit                VARCHAR(100)       DEFAULT NULL,
-  role                ENUM('admin','coordinator','member','viewer','superViewer')
+  avatar              VARCHAR(500)        DEFAULT NULL,
+  unit                VARCHAR(100)        DEFAULT NULL,
+  role                ENUM('admin','coordinator','member','superViewer')
                       DEFAULT 'member',
-  is_active           BOOLEAN            DEFAULT TRUE,
-  reset_token         VARCHAR(255)       DEFAULT NULL,
-  reset_token_expires DATETIME           DEFAULT NULL,
-  created_at          TIMESTAMP          DEFAULT CURRENT_TIMESTAMP,
-  updated_at          TIMESTAMP          DEFAULT CURRENT_TIMESTAMP
+  is_active           BOOLEAN             DEFAULT TRUE,
+  reset_token         VARCHAR(255)        DEFAULT NULL,
+  reset_token_expires DATETIME            DEFAULT NULL,
+  created_at          TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP           DEFAULT CURRENT_TIMESTAMP
                       ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -61,26 +66,32 @@ CREATE TABLE units (
 
 -- ------------------------------------------------------------
 -- 3. Proyectos
+--    presupuesto: control financiero del proyecto
 -- ------------------------------------------------------------
 CREATE TABLE projects (
-  id          INT PRIMARY KEY AUTO_INCREMENT,
-  name        VARCHAR(255) NOT NULL,
-  description TEXT,
-  objectives  TEXT,
-  start_date  DATE,
-  end_date    DATE,
-  status      ENUM('active','paused','completed','cancelled') DEFAULT 'active',
-  progress    INT           DEFAULT 0,
-  owner_id    INT           DEFAULT NULL,
-  color       VARCHAR(7)    DEFAULT '#3B82F6',
-  created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
-              ON UPDATE CURRENT_TIMESTAMP,
+  id           INT PRIMARY KEY AUTO_INCREMENT,
+  name         VARCHAR(255) NOT NULL,
+  description  TEXT,
+  objectives   TEXT,
+  start_date   DATE,
+  end_date     DATE,
+  status       ENUM('active','paused','completed','cancelled') DEFAULT 'active',
+  progress     INT            DEFAULT 0,
+  owner_id     INT            DEFAULT NULL,
+  color        VARCHAR(7)     DEFAULT '#3B82F6',
+  presupuesto  DECIMAL(14,2)  DEFAULT NULL,
+  created_at   TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP      DEFAULT CURRENT_TIMESTAMP
+               ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ------------------------------------------------------------
 -- 4. Miembros de proyecto
+--    role: rol dentro del proyecto (independiente del rol global)
+--      coordinator → puede editar y gestionar el proyecto
+--      member      → puede crear y editar tareas
+--      viewer      → solo lectura dentro del proyecto
 -- ------------------------------------------------------------
 CREATE TABLE project_members (
   id         INT PRIMARY KEY AUTO_INCREMENT,
@@ -89,8 +100,8 @@ CREATE TABLE project_members (
   role       ENUM('coordinator','member','viewer') DEFAULT 'member',
   joined_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY unique_member (project_id, user_id),
-  FOREIGN KEY (project_id) REFERENCES projects(id)  ON DELETE CASCADE,
-  FOREIGN KEY (user_id)    REFERENCES users(id)      ON DELETE CASCADE
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id)    REFERENCES users(id)     ON DELETE CASCADE
 );
 
 -- ------------------------------------------------------------
@@ -106,19 +117,23 @@ CREATE TABLE labels (
 
 -- ------------------------------------------------------------
 -- 6. Tareas
+--    status: VARCHAR(100) para soportar columnas personalizadas
+--            del tablero Kanban además de los estados base.
+--    costo:  costo real ejecutado de la tarea (control financiero)
 -- ------------------------------------------------------------
 CREATE TABLE tasks (
   id          INT PRIMARY KEY AUTO_INCREMENT,
-  project_id  INT NOT NULL,
+  project_id  INT          NOT NULL,
   title       VARCHAR(255) NOT NULL,
   description TEXT,
   assignee_id INT          DEFAULT NULL,
   start_date  DATE         DEFAULT NULL,
   due_date    DATE         DEFAULT NULL,
   priority    ENUM('low','medium','high','critical') DEFAULT 'medium',
-  status      ENUM('pending','in_progress','in_review','completed') DEFAULT 'pending',
+  status      VARCHAR(100) NOT NULL DEFAULT 'pending',
   position    INT          DEFAULT 0,
   progress    INT          DEFAULT 0,
+  costo       DECIMAL(12,2) DEFAULT NULL,
   created_by  INT          DEFAULT NULL,
   created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
@@ -144,7 +159,7 @@ CREATE TABLE task_labels (
 -- ------------------------------------------------------------
 CREATE TABLE task_checklist_items (
   id           INT PRIMARY KEY AUTO_INCREMENT,
-  task_id      INT NOT NULL,
+  task_id      INT          NOT NULL,
   text         VARCHAR(500) NOT NULL,
   is_completed BOOLEAN      DEFAULT FALSE,
   position     INT          DEFAULT 0,
@@ -227,7 +242,30 @@ CREATE TABLE notifications (
 );
 
 -- ------------------------------------------------------------
--- 14. Índices de rendimiento
+-- 14. SGC — Sistema de Gestión de Calidad
+-- ------------------------------------------------------------
+CREATE TABLE sgc_evidencias (
+  id               INT          PRIMARY KEY AUTO_INCREMENT,
+  dimension        VARCHAR(255) NOT NULL,
+  criterio         VARCHAR(255) NOT NULL,
+  evidencia        VARCHAR(30)  NOT NULL,
+  nombre_evidencia VARCHAR(255) NOT NULL,
+  descripcion      TEXT         DEFAULT NULL,
+  created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_evidencia (evidencia)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE task_sgc (
+  task_id      INT NOT NULL,
+  evidencia_id INT NOT NULL,
+  PRIMARY KEY (task_id, evidencia_id),
+  FOREIGN KEY (task_id)      REFERENCES tasks(id)          ON DELETE CASCADE,
+  FOREIGN KEY (evidencia_id) REFERENCES sgc_evidencias(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 15. Índices de rendimiento
 -- ------------------------------------------------------------
 CREATE INDEX idx_tasks_project        ON tasks(project_id);
 CREATE INDEX idx_tasks_assignee       ON tasks(assignee_id);
@@ -239,7 +277,7 @@ CREATE INDEX idx_checklist_task       ON task_checklist_items(task_id);
 CREATE INDEX idx_units_name           ON units(name);
 
 -- ------------------------------------------------------------
--- 15. Usuario administrador inicial
+-- 16. Usuario administrador inicial
 --     Contraseña: Admin1234
 -- ------------------------------------------------------------
 INSERT INTO users (name, email, password, role, is_active)

@@ -41,6 +41,8 @@ app.use('/api/projects/:project_id/tasks', require('./routes/tasks'));
 app.use('/api/projects/:project_id/tasks/:task_id/checklist', require('./routes/checklist'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/sgc',       require('./routes/sgc'));
+app.use('/api/my-tasks',  require('./routes/myTasks'));
 
 // Health check
 app.get('/api/health', (req, res) => {

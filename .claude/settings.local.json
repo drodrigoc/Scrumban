@@ -9,7 +9,11 @@
       "Read(//mnt/c/Users/Rodrigo Centeno/Documents/Claude/Scrumban/**)",
       "Bash(npm install *)",
       "Bash(node -e \"require\\('./src/config/logger'\\); console.log\\('logger OK'\\)\")",
-      "Bash(git -C \"C:\\\\Users\\\\ING IVAN ALVARADO\\\\Documents\\\\Sistemas\\\\Scrumban\\\\Scrumban\" log --oneline -10)"
+      "Bash(git -C \"C:\\\\Users\\\\ING IVAN ALVARADO\\\\Documents\\\\Sistemas\\\\Scrumban\\\\Scrumban\" log --oneline -10)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ING RODRIGO CENTENO\\\\Documents\\\\Sistemas\\\\Srumban\\\\Scrumban\\\\frontend\\\\src\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Recurse)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

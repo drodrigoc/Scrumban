@@ -1,18 +1,19 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, FolderKanban, Users, LogOut, X, UsersRound, Building2, Landmark } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Users, LogOut, X, UsersRound, Building2, Landmark, ShieldCheck, CheckSquare } from 'lucide-react';
 import logo from '../../assets/logousocompleto.png';
 
 const navItems = [
   { to: '/',        icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/projects', icon: FolderKanban,   label: 'Proyectos' },
+  { to: '/projects', icon: FolderKanban,  label: 'Proyectos' },
+  { to: '/my-tasks', icon: CheckSquare,  label: 'Mis Tareas' },
 ];
 
 const roleLabels = {
   admin:       'Administrador',
   coordinator: 'Coordinador',
   member:      'Miembro',
-  viewer:      'Visor',
+
   superViewer: 'Super Visor',
 };
 
@@ -24,6 +25,7 @@ export default function Sidebar({ open, onClose }) {
 
   const isTeamVisible  = ['admin', 'coordinator', 'superViewer'].includes(user?.role);
   const isAdminVisible = user?.role === 'admin';
+  const isSuperViewer  = user?.role === 'superViewer';
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -45,11 +47,9 @@ export default function Sidebar({ open, onClose }) {
         ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:overflow-hidden'}
       `}>
         {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="USO Projects" className="h-8 w-auto object-contain dark:brightness-90" />
-          </div>
-          <button onClick={onClose} className="lg:hidden p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+          <img src={logo} alt="USO Projects" className="w-full h-auto object-contain dark:brightness-90 max-h-16" />
+          <button onClick={onClose} className="lg:hidden p-1 ml-2 flex-shrink-0 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -90,6 +90,22 @@ export default function Sidebar({ open, onClose }) {
               <NavLink to="/users" className={linkClass}>
                 <Users className="w-4 h-4 flex-shrink-0" />
                 Control de Accesos
+              </NavLink>
+              <NavLink to="/sgc" className={linkClass}>
+                <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                SGC
+              </NavLink>
+            </>
+          )}
+
+          {isSuperViewer && (
+            <>
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2 mt-4">
+                Supervisión
+              </p>
+              <NavLink to="/sgc" className={linkClass}>
+                <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                SGC
               </NavLink>
             </>
           )}

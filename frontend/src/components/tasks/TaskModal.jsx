@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { tasksAPI, projectsAPI } from '../../services/api';
+import { tasksAPI, projectsAPI, sgcAPI } from '../../services/api';
 import {
   Trash2, Send, Paperclip, Clock, Tag, User, Calendar,
-  AlertTriangle, CheckSquare, Plus, X, Check,
+  AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -15,7 +15,7 @@ const priorityOptions = [
   { value: 'critical', label: 'Crítica' },
 ];
 
-const statusOptions = [
+const DEFAULT_STATUS_OPTIONS = [
   { value: 'pending',     label: 'Pendiente' },
   { value: 'in_progress', label: 'En Proceso' },
   { value: 'in_review',   label: 'En Revisión' },
@@ -34,7 +34,8 @@ const PRESET_COLORS = [
   '#3B82F6', '#0EA5E9', '#64748B', '#78716C',
 ];
 
-export default function TaskModal({ task, projectId, members, labels: initialLabels, onSave, onDelete, onCancel, onCommentAdded, onLabelCreated }) {
+export default function TaskModal({ task, projectId, members, labels: initialLabels, columnOptions, onSave, onDelete, onCancel, onCommentAdded, onLabelCreated, readOnly = false }) {
+  const statusOptions = columnOptions?.length ? columnOptions : DEFAULT_STATUS_OPTIONS;
   const [form, setForm] = useState({
     title:       task?.title || '',
     description: task?.description || '',
@@ -45,7 +46,17 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
     status:      task?.status     || 'pending',
     progress:    task?.progress   || 0,
     label_ids:   task?.labels?.map(l => l.id) || [],
+    sgc_ids:     task?.sgc_evidencias?.map(e => e.id) || [],
+    costo:       task?.costo != null ? String(task.costo) : '',
   });
+
+  // SGC state
+  const [sgcEvidencias, setSgcEvidencias] = useState([]);
+  const [sgcLinkedIds, setSgcLinkedIds]   = useState(task?.sgc_evidencias?.map(e => e.id) || []);
+  const [sgcSearch, setSgcSearch]         = useState('');
+  const [sgcOpen, setSgcOpen]             = useState(false);
+  const [sgcSaving, setSgcSaving]         = useState(false);
+  const sgcSearchRef = useRef(null);
 
   // Local copy of labels — grows when user creates a new one inline
   const [localLabels, setLocalLabels] = useState(initialLabels || []);
@@ -66,6 +77,13 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
   const [loadingChecklist, setLoadingChecklist] = useState(false);
   const [newItemText, setNewItemText] = useState('');
   const [addingItem, setAddingItem] = useState(false);
+
+  // Load SGC evidencias on mount
+  useEffect(() => {
+    sgcAPI.getAll()
+      .then(({ data }) => setSgcEvidencias(data))
+      .catch(() => {}); // silently fail — SGC is optional
+  }, []);
 
   // Load checklist lazily when tab is first opened
   useEffect(() => {
@@ -91,6 +109,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
         assignee_id: form.assignee_id || null,
         start_date:  form.start_date  || null,
         due_date:    form.due_date    || null,
+        costo:       form.costo !== '' ? parseFloat(form.costo) : null,
       });
     } finally {
       setSaving(false);
@@ -110,6 +129,29 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       setSubmittingComment(false);
     }
   };
+
+  const toggleSgc = async (evidenciaId) => {
+    const newIds = sgcLinkedIds.includes(evidenciaId)
+      ? sgcLinkedIds.filter(id => id !== evidenciaId)
+      : [...sgcLinkedIds, evidenciaId];
+    setSgcLinkedIds(newIds);
+    setSgcSaving(true);
+    try {
+      await tasksAPI.update(projectId, task.id, { sgc_ids: newIds });
+    } catch {
+      setSgcLinkedIds(sgcLinkedIds); // rollback
+      toast.error('Error al actualizar SGC');
+    } finally {
+      setSgcSaving(false);
+    }
+  };
+
+  const sgcFiltered = sgcEvidencias.filter(e =>
+    e.evidencia.toLowerCase().includes(sgcSearch.toLowerCase()) ||
+    e.nombre_evidencia.toLowerCase().includes(sgcSearch.toLowerCase()) ||
+    e.dimension.toLowerCase().includes(sgcSearch.toLowerCase()) ||
+    e.criterio.toLowerCase().includes(sgcSearch.toLowerCase())
+  );
 
   const toggleLabel = (labelId) => {
     setForm(prev => ({
@@ -188,6 +230,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
           ? `Checklist (${checklistDone}/${checklistTotal})`
           : 'Checklist',
       },
+      { id: 'sgc',         label: `SGC${sgcLinkedIds.length ? ` (${sgcLinkedIds.length})` : ''}` },
       { id: 'comments',    label: `Comentarios${task.comments?.length ? ` (${task.comments.length})` : ''}` },
       { id: 'history',     label: 'Historial' },
       { id: 'attachments', label: 'Archivos' },
@@ -195,7 +238,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
   ];
 
   return (
-    <div className="flex flex-col gap-0">
+    <div className="flex flex-col gap-0 min-h-[520px]">
       {/* Tabs */}
       {task?.id && (
         <div className="flex border-b border-gray-100 dark:border-gray-700 -mx-5 px-5 mb-4 gap-1 overflow-x-auto">
@@ -218,6 +261,8 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       {/* ── DETAILS ── */}
       {activeTab === 'details' && (
         <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={readOnly} className="contents">
+
           <div>
             <label className="label">Título *</label>
             <input type="text" className="input" value={form.title}
@@ -275,6 +320,24 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 type="range" min="0" max="100" step="5" value={form.progress}
                 onChange={e => setForm({ ...form, progress: parseInt(e.target.value) })}
                 className="w-full mt-2 accent-primary-600"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="label flex items-center gap-1">
+              <span className="text-gray-400 text-sm font-medium">$</span> Costo (USD)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium select-none">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="input pl-7"
+                placeholder="0.00"
+                value={form.costo}
+                onChange={e => setForm({ ...form, costo: e.target.value })}
               />
             </div>
           </div>
@@ -363,24 +426,139 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             )}
           </div>
 
+          </fieldset>
+
           <div className="flex gap-2 pt-2">
-            <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
-            {onDelete && (
-              <button type="button" className="btn-danger px-3" onClick={onDelete}>
-                <Trash2 className="w-4 h-4" />
-              </button>
+            {readOnly ? (
+              <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cerrar</button>
+            ) : (
+              <>
+                <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
+                {onDelete && (
+                  <button type="button" className="btn-danger px-3" onClick={onDelete}>
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button type="submit" disabled={saving} className="btn-primary flex-1">
+                  {saving
+                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : 'Guardar'
+                  }
+                </button>
+              </>
             )}
-            <button type="submit" disabled={saving} className="btn-primary flex-1">
-              {saving
-                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : 'Guardar'
-              }
-            </button>
           </div>
         </form>
       )}
 
       {/* ── CHECKLIST ── */}
+      {/* ── SGC ── */}
+      {activeTab === 'sgc' && task?.id && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Sistema de Gestión de la Calidad</span>
+            </div>
+            {sgcSaving && (
+              <div className="w-3.5 h-3.5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
+
+          {/* Chips de evidencias vinculadas */}
+          {sgcLinkedIds.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {sgcEvidencias
+                .filter(e => sgcLinkedIds.includes(e.id))
+                .map(e => (
+                  <span
+                    key={e.id}
+                    className="inline-flex items-center gap-1.5 text-xs bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-800 px-2.5 py-1.5 rounded-full font-medium"
+                  >
+                    <span className="font-mono font-bold">{e.evidencia}</span>
+                    <span className="text-primary-400 dark:text-primary-500">·</span>
+                    <span className="max-w-[150px] truncate">{e.nombre_evidencia}</span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSgc(e.id)}
+                        className="ml-0.5 hover:text-primary-900 dark:hover:text-primary-100 flex-shrink-0"
+                        title="Desvincular"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </span>
+                ))
+              }
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 dark:text-gray-500 py-2">
+              {readOnly ? 'Sin evidencias vinculadas.' : 'Sin evidencias vinculadas. Usa el buscador para agregar.'}
+            </p>
+          )}
+
+          {/* Buscador — solo en modo edición */}
+          {!readOnly && <div className="relative pt-1 border-t border-gray-100 dark:border-gray-700">
+            <input
+              ref={sgcSearchRef}
+              type="text"
+              className="input text-sm py-1.5 pr-8 mt-2"
+              placeholder="Buscar evidencia por código, nombre, dimensión o criterio…"
+              value={sgcSearch}
+              onChange={e => { setSgcSearch(e.target.value); setSgcOpen(true); }}
+              onFocus={() => setSgcOpen(true)}
+              onBlur={() => setTimeout(() => setSgcOpen(false), 150)}
+            />
+            {sgcSearch && (
+              <button
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setSgcSearch('')}
+                className="absolute right-2 top-1/2 translate-y-0.5 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {sgcOpen && sgcFiltered.length > 0 && (
+              <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                {sgcFiltered.map(e => {
+                  const linked = sgcLinkedIds.includes(e.id);
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onMouseDown={ev => ev.preventDefault()}
+                      onClick={() => { toggleSgc(e.id); setSgcSearch(''); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${linked ? 'bg-primary-50 dark:bg-primary-900/30' : ''}`}
+                    >
+                      <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400 w-14 flex-shrink-0">{e.evidencia}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{e.nombre_evidencia}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{e.dimension} · {e.criterio}</p>
+                      </div>
+                      {linked && <Check className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {sgcOpen && sgcSearch && sgcFiltered.length === 0 && (
+              <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-3 text-sm text-gray-400 dark:text-gray-500">
+                Sin resultados para "{sgcSearch}"
+              </div>
+            )}
+          </div>}
+
+          {!readOnly && sgcEvidencias.length === 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              No hay evidencias SGC registradas. El administrador debe crearlas primero.
+            </p>
+          )}
+        </div>
+      )}
+
       {activeTab === 'checklist' && task?.id && (
         <div className="space-y-3">
           {/* Progress bar */}
@@ -441,7 +619,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
           </div>
 
           {/* Add item */}
-          <div className="flex gap-2 pt-1 border-t border-gray-100 dark:border-gray-700">
+          {!readOnly && <div className="flex gap-2 pt-1 border-t border-gray-100 dark:border-gray-700">
             <input
               type="text"
               className="input flex-1 text-sm"
@@ -460,7 +638,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 : <Plus className="w-4 h-4" />
               }
             </button>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -485,17 +663,19 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               </div>
             ))}
           </div>
-          <div className="flex gap-2">
-            <input
-              type="text" className="input flex-1"
-              placeholder="Escribir comentario..."
-              value={comment} onChange={e => setComment(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleComment()}
-            />
-            <button onClick={handleComment} disabled={submittingComment || !comment.trim()} className="btn-primary px-3">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="flex gap-2">
+              <input
+                type="text" className="input flex-1"
+                placeholder="Escribir comentario..."
+                value={comment} onChange={e => setComment(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleComment()}
+              />
+              <button onClick={handleComment} disabled={submittingComment || !comment.trim()} className="btn-primary px-3">
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

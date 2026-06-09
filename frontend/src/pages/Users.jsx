@@ -8,7 +8,6 @@ export const roleConfig = {
   admin:       { label: 'Administrador', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
   coordinator: { label: 'Coordinador',   color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
   member:      { label: 'Miembro',       color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
-  viewer:      { label: 'Visor',         color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
   superViewer: { label: 'Super Visor',   color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
 };
 
@@ -112,10 +111,9 @@ export default function Users() {
           <option value="admin">Administrador</option>
           <option value="coordinator">Coordinador</option>
           <option value="member">Miembro</option>
-          <option value="viewer">Visor</option>
           <option value="superViewer">Super Visor</option>
         </select>
-        <select value={filterUnit} onChange={e => setFilterUnit(e.target.value)} className="input w-auto">
+<select value={filterUnit} onChange={e => setFilterUnit(e.target.value)} className="input w-auto">
           <option value="all">Todas las unidades</option>
           {unitNames.map(u => <option key={u} value={u}>{u}</option>)}
         </select>
@@ -137,7 +135,7 @@ export default function Users() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={5} className="text-center text-gray-400 dark:text-gray-500 py-8">No hay usuarios</td></tr>
               ) : filtered.map(u => {
-                const roleInfo = roleConfig[u.role] || roleConfig.viewer;
+                const roleInfo = roleConfig[u.role] || roleConfig.member;
                 return (
                   <tr key={u.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
                     <td className="px-4 py-3">
@@ -274,7 +272,6 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
           <option value="admin">Administrador</option>
           <option value="coordinator">Coordinador</option>
           <option value="member">Miembro</option>
-          <option value="viewer">Visor</option>
           <option value="superViewer">Super Visor</option>
         </select>
       </div>

@@ -111,7 +111,12 @@ exports.getById = async (req, res) => {
       WHERE td.task_id = ?
     `, [req.params.id]);
 
-    res.json({ ...tasks[0], labels, comments, attachments, history, dependencies: deps });
+    const [sgcEvidencias] = await db.query(
+      'SELECT e.* FROM sgc_evidencias e JOIN task_sgc ts ON e.id = ts.evidencia_id WHERE ts.task_id = ? ORDER BY e.evidencia ASC',
+      [req.params.id]
+    );
+
+    res.json({ ...tasks[0], labels, comments, attachments, history, dependencies: deps, sgc_evidencias: sgcEvidencias });
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al obtener tarea' });
@@ -121,7 +126,7 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { project_id } = req.params;
-    const { title, description, assignee_id, start_date, due_date, priority, status, label_ids } = req.body;
+    const { title, description, assignee_id, start_date, due_date, priority, status, label_ids, sgc_ids, costo } = req.body;
 
     if (!title) return res.status(400).json({ message: 'El título es requerido' });
 
@@ -132,10 +137,10 @@ exports.create = async (req, res) => {
     const position = (maxPos[0].max || 0) + 1;
 
     const [result] = await db.query(
-      `INSERT INTO tasks (project_id, title, description, assignee_id, start_date, due_date, priority, status, position, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (project_id, title, description, assignee_id, start_date, due_date, priority, status, position, created_by, costo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [project_id, title, description, assignee_id || null, start_date || null, due_date || null,
-       priority || 'medium', status || 'pending', position, req.user.id]
+       priority || 'medium', status || 'pending', position, req.user.id, costo || null]
     );
 
     const taskId = result.insertId;
@@ -143,6 +148,11 @@ exports.create = async (req, res) => {
     if (label_ids && label_ids.length) {
       const labelValues = label_ids.map(lid => [taskId, lid]);
       await db.query('INSERT INTO task_labels (task_id, label_id) VALUES ?', [labelValues]);
+    }
+
+    if (sgc_ids && sgc_ids.length) {
+      const sgcValues = sgc_ids.map(eid => [taskId, eid]);
+      await db.query('INSERT INTO task_sgc (task_id, evidencia_id) VALUES ?', [sgcValues]);
     }
 
     if (assignee_id && assignee_id !== req.user.id) {
@@ -162,7 +172,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, assignee_id, start_date, due_date, priority, status, position, progress, label_ids } = req.body;
+    const { title, description, assignee_id, start_date, due_date, priority, status, position, progress, label_ids, sgc_ids, costo } = req.body;
 
     const [current] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
     if (!current.length) return res.status(404).json({ message: 'Tarea no encontrada' });
@@ -198,6 +208,7 @@ exports.update = async (req, res) => {
     }
     if (position !== undefined) { fields.push('position = ?'); values.push(position); }
     if (progress !== undefined) { fields.push('progress = ?'); values.push(progress); }
+    if (costo !== undefined) { fields.push('costo = ?'); values.push(costo || null); }
 
     if (fields.length) {
       values.push(id);
@@ -210,6 +221,15 @@ exports.update = async (req, res) => {
       if (label_ids.length) {
         const labelValues = label_ids.map(lid => [id, lid]);
         await db.query('INSERT INTO task_labels (task_id, label_id) VALUES ?', [labelValues]);
+      }
+    }
+
+    // Actualizar evidencias SGC
+    if (sgc_ids !== undefined) {
+      await db.query('DELETE FROM task_sgc WHERE task_id = ?', [id]);
+      if (sgc_ids.length) {
+        const sgcValues = sgc_ids.map(eid => [id, eid]);
+        await db.query('INSERT INTO task_sgc (task_id, evidencia_id) VALUES ?', [sgcValues]);
       }
     }
 

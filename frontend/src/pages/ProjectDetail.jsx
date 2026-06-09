@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { projectsAPI, usersAPI, unitsAPI } from '../services/api';
-import { Kanban, CalendarDays, GanttChartSquare, List, ArrowLeft, Edit, Users, Plus, Trash2, Building2 } from 'lucide-react';
+import { Kanban, CalendarDays, GanttChartSquare, List, ArrowLeft, Edit, Users, Plus, Trash2, Building2, DollarSign, UserCog } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import { useAuth } from '../context/AuthContext';
@@ -22,8 +22,9 @@ export default function ProjectDetail() {
   const [allUsers, setAllUsers] = useState([]);
   const [units, setUnits]       = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [showEditModal, setShowEditModal]   = useState(false);
+  const [showEditModal, setShowEditModal]       = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  const [editingRoleId, setEditingRoleId]       = useState(null); // id del miembro cuyo rol se edita
 
   useEffect(() => {
     Promise.all([projectsAPI.getById(id), usersAPI.getAll(), unitsAPI.getAll()])
@@ -59,6 +60,18 @@ export default function ProjectDetail() {
     } catch { toast.error('Error al eliminar miembro'); }
   };
 
+  const handleUpdateRole = async (userId, newRole) => {
+    try {
+      await projectsAPI.updateMemberRole(id, userId, newRole);
+      setProject(prev => ({
+        ...prev,
+        members: prev.members.map(m => m.id === userId ? { ...m, project_role: newRole } : m),
+      }));
+      setEditingRoleId(null);
+      toast.success('Rol actualizado');
+    } catch { toast.error('Error al actualizar rol'); }
+  };
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -72,7 +85,17 @@ export default function ProjectDetail() {
   const totalTasks = taskStats.reduce((sum, s) => sum + s.count, 0);
   const completedTasks = taskStats.find(s => s.status === 'completed')?.count || 0;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const canEdit = user?.role === 'admin' || project.owner_id === user?.id;
+  const myProjectRole = project.members?.find(m => m.id === user?.id)?.project_role;
+  const canEdit = user?.role === 'admin'
+    || user?.role === 'coordinator'
+    || project.owner_id === user?.id
+    || myProjectRole === 'coordinator';
+
+  const presupuesto  = project.presupuesto  != null ? parseFloat(project.presupuesto)  : null;
+  const totalCosto   = project.total_costo  != null ? parseFloat(project.total_costo)  : 0;
+  const disponible   = presupuesto != null ? presupuesto - totalCosto : null;
+  const budgetPct    = presupuesto > 0 ? Math.min(100, Math.round((totalCosto / presupuesto) * 100)) : 0;
+  const fmt          = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
   const views = [
     { to: `/projects/${id}/backlog`,   icon: List,             label: 'Backlog' },
@@ -128,6 +151,52 @@ export default function ProjectDetail() {
         ))}
       </div>
 
+      {/* Financial Summary */}
+      {(presupuesto != null || totalCosto > 0) && (
+        <div className="card p-5">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-4">
+            <DollarSign className="w-4 h-4 text-green-500" />
+            Control de Gastos
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            {presupuesto != null && (
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Presupuesto</p>
+                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{fmt(presupuesto)}</p>
+              </div>
+            )}
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Gastado</p>
+              <p className={`text-lg font-bold ${disponible != null && disponible < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                {fmt(totalCosto)}
+              </p>
+            </div>
+            {disponible != null && (
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Disponible</p>
+                <p className={`text-lg font-bold ${disponible < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                  {fmt(disponible)}
+                </p>
+              </div>
+            )}
+          </div>
+          {presupuesto != null && presupuesto > 0 && (
+            <div>
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                <span>Ejecución presupuestaria</span>
+                <span className={budgetPct >= 100 ? 'text-red-500 font-semibold' : ''}>{budgetPct}%</span>
+              </div>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${budgetPct >= 100 ? 'bg-red-500' : budgetPct >= 80 ? 'bg-amber-500' : 'bg-green-500'}`}
+                  style={{ width: `${budgetPct}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Views */}
       <div>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Vistas</h2>
@@ -161,20 +230,50 @@ export default function ProjectDetail() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {project.members?.map(m => (
-            <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-sm">
+            <div key={m.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-sm flex-shrink-0">
                   {m.name?.charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{m.name}</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">{m.project_role}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{m.name}</p>
+                  {/* Rol: selector inline si se está editando, etiqueta si no */}
+                  {canEdit && m.id !== user?.id && editingRoleId === m.id ? (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <select
+                        autoFocus
+                        defaultValue={m.project_role}
+                        onChange={e => handleUpdateRole(m.id, e.target.value)}
+                        onBlur={() => setEditingRoleId(null)}
+                        className="text-xs border border-primary-400 rounded px-1 py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none"
+                      >
+                        <option value="coordinator">Coordinador</option>
+                        <option value="member">Miembro</option>
+                        <option value="viewer">Visor</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">{m.project_role}</p>
+                  )}
                 </div>
               </div>
               {canEdit && m.id !== user?.id && (
-                <button onClick={() => handleRemoveMember(m.id)} className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => setEditingRoleId(editingRoleId === m.id ? null : m.id)}
+                    title="Cambiar rol"
+                    className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+                  >
+                    <UserCog className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleRemoveMember(m.id)}
+                    title="Eliminar miembro"
+                    className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )}
             </div>
           ))}
@@ -290,7 +389,6 @@ function AddMemberForm({ allUsers, units, currentMembers, onAdd, onClose }) {
           <select value={role} onChange={e => setRole(e.target.value)} className="input">
             <option value="coordinator">Coordinador</option>
             <option value="member">Miembro</option>
-            <option value="viewer">Visor</option>
           </select>
         </div>
       )}

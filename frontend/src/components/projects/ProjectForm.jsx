@@ -4,18 +4,22 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'
 
 export default function ProjectForm({ project, users, onSave, onCancel }) {
   const [form, setForm] = useState({
-    name: project?.name || '',
+    name:        project?.name        || '',
     description: project?.description || '',
-    objectives: project?.objectives || '',
-    start_date: project?.start_date ? project.start_date.split('T')[0] : '',
-    end_date: project?.end_date ? project.end_date.split('T')[0] : '',
-    status: project?.status || 'active',
-    color: project?.color || '#3B82F6',
+    objectives:  project?.objectives  || '',
+    start_date:  project?.start_date  ? project.start_date.split('T')[0] : '',
+    end_date:    project?.end_date    ? project.end_date.split('T')[0]   : '',
+    status:      project?.status      || 'active',
+    color:       project?.color       || '#3B82F6',
+    presupuesto: project?.presupuesto != null ? String(project.presupuesto) : '',
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(form);
+    onSave({
+      ...form,
+      presupuesto: form.presupuesto !== '' ? parseFloat(form.presupuesto) : null,
+    });
   };
 
   return (
@@ -54,6 +58,22 @@ export default function ProjectForm({ project, users, onSave, onCancel }) {
           <option value="completed">Completado</option>
           <option value="cancelled">Cancelado</option>
         </select>
+      </div>
+
+      <div>
+        <label className="label">Presupuesto (USD)</label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="input pl-7"
+            placeholder="0.00"
+            value={form.presupuesto}
+            onChange={e => setForm({ ...form, presupuesto: e.target.value })}
+          />
+        </div>
       </div>
 
       <div>

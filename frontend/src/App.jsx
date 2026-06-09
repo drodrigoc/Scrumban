@@ -18,6 +18,8 @@ import BacklogView from './pages/BacklogView';
 import TeamView from './pages/TeamView';
 import UnitsAdmin from './pages/UnitsAdmin';
 import Users from './pages/Users';
+import SGCAdmin from './pages/SGCAdmin';
+import MyTasks from './pages/MyTasks';
 import NotFound from './pages/NotFound';
 
 function PrivateRoute({ children, roles }) {
@@ -42,6 +44,7 @@ function AppRoutes() {
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
+        <Route path="my-tasks" element={<MyTasks />} />
         <Route path="projects/:id" element={<ProjectDetail />} />
         <Route path="projects/:id/backlog" element={<BacklogView />} />
         <Route path="projects/:id/kanban" element={<KanbanBoard />} />
@@ -60,6 +63,11 @@ function AppRoutes() {
         <Route path="users" element={
           <PrivateRoute roles={['admin']}>
             <Users />
+          </PrivateRoute>
+        } />
+        <Route path="sgc" element={
+          <PrivateRoute roles={['admin', 'superViewer']}>
+            <SGCAdmin />
           </PrivateRoute>
         } />
       </Route>

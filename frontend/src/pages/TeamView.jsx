@@ -311,7 +311,6 @@ export default function TeamView() {
           <option value="all">Todos los roles</option>
           <option value="coordinator">Coordinador</option>
           <option value="member">Miembro</option>
-          <option value="viewer">Visor</option>
         </select>
       </div>
 

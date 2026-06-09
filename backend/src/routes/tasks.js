@@ -1,22 +1,24 @@
 const router = require('express').Router({ mergeParams: true });
 const ctrl = require('../controllers/taskController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, denyProjectViewer } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 router.use(authenticate);
 
-router.get('/', ctrl.getByProject);
-router.post('/', ctrl.create);
-router.patch('/positions', ctrl.updatePositions);
-
+// Solo lectura — permitido a todos
+router.get('/',    ctrl.getByProject);
 router.get('/:id', ctrl.getById);
-router.put('/:id', ctrl.update);
-router.delete('/:id', ctrl.delete);
 
-router.post('/:id/comments', ctrl.addComment);
-router.delete('/:id/comments/:commentId', ctrl.deleteComment);
+// Escritura — bloqueado para viewers del proyecto
+router.post('/',              denyProjectViewer, ctrl.create);
+router.patch('/positions',    denyProjectViewer, ctrl.updatePositions);
+router.put('/:id',            denyProjectViewer, ctrl.update);
+router.delete('/:id',         denyProjectViewer, ctrl.delete);
 
-router.post('/:id/attachments', upload.single('file'), ctrl.uploadAttachment);
-router.delete('/:id/attachments/:attachmentId', ctrl.deleteAttachment);
+router.post('/:id/comments',                denyProjectViewer, ctrl.addComment);
+router.delete('/:id/comments/:commentId',   denyProjectViewer, ctrl.deleteComment);
+
+router.post('/:id/attachments', denyProjectViewer, upload.single('file'), ctrl.uploadAttachment);
+router.delete('/:id/attachments/:attachmentId', denyProjectViewer, ctrl.deleteAttachment);
 
 module.exports = router;

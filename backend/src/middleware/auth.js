@@ -43,4 +43,28 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { authenticate, authorize };
+// Bloquea acceso si el usuario tiene rol 'viewer' en el proyecto
+// Solo aplica a usuarios no-admin; admins siempre pasan.
+const denyProjectViewer = async (req, res, next) => {
+  try {
+    if (req.user.role === 'admin') return next();
+
+    const projectId = req.params.project_id || req.params.id;
+    if (!projectId) return next();
+
+    const [rows] = await db.query(
+      'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
+      [projectId, req.user.id]
+    );
+
+    if (rows.length && rows[0].role === 'viewer') {
+      return res.status(403).json({ message: 'Los visores no pueden modificar tareas en este proyecto' });
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { authenticate, authorize, denyProjectViewer };

@@ -5,12 +5,12 @@ exports.getStats = async (req, res) => {
   try {
     const userId  = req.user.id;
     const role    = req.user.role;
-    const isAdmin = role === 'admin' || role === 'superViewer';
+    const isAdmin      = role === 'admin' || role === 'superViewer';
+    const isCoordinator = role === 'coordinator';
+    // members solo ven sus propias tareas
+    const isMember     = !isAdmin && !isCoordinator;
 
     // ── Filtros ──────────────────────────────────────────────────────────────
-    // Para admin/superViewer: sin restricción.
-    // Para coordinador: solo proyectos donde es dueño o miembro.
-    // Para el resto: ídem coordinador (sus propios proyectos).
     const projectWhere = isAdmin
       ? 'WHERE 1=1'
       : `WHERE (p.owner_id = ${userId} OR EXISTS (
@@ -25,9 +25,12 @@ exports.getStats = async (req, res) => {
          UNION
          SELECT project_id FROM project_members WHERE user_id = ${userId}`;
 
+    // Members: solo sus tareas asignadas
     const taskWhere = isAdmin
       ? 'WHERE 1=1'
-      : `WHERE t.project_id IN (${visibleProjects})`;
+      : isMember
+        ? `WHERE t.project_id IN (${visibleProjects}) AND t.assignee_id = ${userId}`
+        : `WHERE t.project_id IN (${visibleProjects})`;
 
     // ── Proyectos por estado ─────────────────────────────────────────────────
     const [projectStats] = await db.query(`
@@ -51,6 +54,7 @@ exports.getStats = async (req, res) => {
       FROM tasks t
       ${taskWhere}
         AND t.status != 'completed'
+        AND t.due_date IS NOT NULL
         AND t.due_date < CURDATE()
     `);
 
@@ -60,6 +64,7 @@ exports.getStats = async (req, res) => {
       FROM tasks t
       ${taskWhere}
         AND t.status != 'completed'
+        AND t.due_date IS NOT NULL
         AND t.due_date >= CURDATE()
         AND t.due_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
     `);
@@ -78,11 +83,14 @@ exports.getStats = async (req, res) => {
     `);
 
     // ── Carga de trabajo por usuario ─────────────────────────────────────────
-    // Se filtra la tarea por proyecto visible; la condición va en el JOIN
-    // para que el LEFT JOIN cuente solo las tareas relevantes.
+    // Members: solo su propia fila. Coordinadores/admin: todo el equipo.
     const taskJoinFilter = isAdmin
       ? ''
       : `AND t.project_id IN (${visibleProjects})`;
+
+    const workloadUserFilter = isMember
+      ? `AND u.id = ${userId}`
+      : '';
 
     const [workload] = await db.query(`
       SELECT u.id, u.name, u.avatar,
@@ -93,7 +101,7 @@ exports.getStats = async (req, res) => {
         ON t.assignee_id = u.id
         AND t.status != 'completed'
         ${taskJoinFilter}
-      WHERE u.is_active = 1
+      WHERE u.is_active = 1 ${workloadUserFilter}
       GROUP BY u.id
       HAVING total_assigned > 0
       ORDER BY total_assigned DESC

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { tasksAPI, projectsAPI } from '../services/api';
 import {
@@ -50,17 +51,18 @@ function SortIcon({ col, sortKey, sortDir }) {
 }
 
 // ── Componente inline-status dropdown ────────────────────────────────────
-function StatusSelect({ value, onChange }) {
+function StatusSelect({ value, onChange, columns }) {
+  const colorClass = statusCfg[value]?.color || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
   return (
     <select
       value={value}
       onChange={e => { e.stopPropagation(); onChange(e.target.value); }}
       onClick={e => e.stopPropagation()}
       className={`text-xs font-medium rounded-full px-2 py-0.5 border-0 outline-none cursor-pointer appearance-none
-                  focus:ring-2 focus:ring-primary-400 ${statusCfg[value]?.color}`}
+                  focus:ring-2 focus:ring-primary-400 ${colorClass}`}
     >
-      {Object.entries(statusCfg).map(([k, v]) => (
-        <option key={k} value={k}>{v.label}</option>
+      {columns.map(c => (
+        <option key={c.id} value={c.id}>{c.label}</option>
       ))}
     </select>
   );
@@ -135,12 +137,27 @@ function QuickAddRow({ onAdd, members, onCancel }) {
 // ── Página principal BacklogView ──────────────────────────────────────────
 export default function BacklogView() {
   const { id: projectId } = useParams();
+  const { user } = useAuth();
 
   const [tasks, setTasks] = useState([]);
   const [project, setProject] = useState(null);
   const [members, setMembers] = useState([]);
   const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Columnas del tablero Kanban (del localStorage del proyecto)
+  const kanbanColumns = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`kanban_columns_${projectId}`);
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return [
+      { id: 'pending',     label: 'Pendiente' },
+      { id: 'in_progress', label: 'En Proceso' },
+      { id: 'in_review',   label: 'En Revisión' },
+      { id: 'completed',   label: 'Completado' },
+    ];
+  }, [projectId]);
 
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -171,6 +188,13 @@ export default function BacklogView() {
     }).catch(() => toast.error('Error al cargar backlog'))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  // Admin siempre puede editar; para el resto verificamos rol en el proyecto
+  const canEdit = useMemo(() => {
+    if (user?.role === 'admin') return true;
+    const me = members.find(m => m.id === user?.id);
+    return !me || me.project_role !== 'viewer';
+  }, [user, members]);
 
   // Cerrar menú contextual al hacer click fuera
   useEffect(() => {
@@ -318,7 +342,7 @@ export default function BacklogView() {
           </div>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input py-1.5 w-auto text-sm">
             <option value="all">Todos los estados</option>
-            {Object.entries(statusCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            {kanbanColumns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
           <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="input py-1.5 w-auto text-sm">
             <option value="all">Todas las prioridades</option>
@@ -331,7 +355,7 @@ export default function BacklogView() {
         </div>
 
         <div className="flex items-center gap-2">
-          {someSelected && (
+          {canEdit && someSelected && (
             <button onClick={handleDeleteSelected}
               className="btn-danger text-xs py-1.5 px-3 flex items-center gap-1">
               <Trash2 className="w-3.5 h-3.5" />
@@ -341,12 +365,14 @@ export default function BacklogView() {
           <span className="text-sm text-gray-400 dark:text-gray-500">
             {filtered.length} tarea{filtered.length !== 1 ? 's' : ''}
           </span>
-          <button
-            onClick={() => { setShowQuickAdd(v => !v); }}
-            className="btn-primary text-sm py-1.5"
-          >
-            <Plus className="w-4 h-4" /> Nueva Tarea
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => { setShowQuickAdd(v => !v); }}
+              className="btn-primary text-sm py-1.5"
+            >
+              <Plus className="w-4 h-4" /> Nueva Tarea
+            </button>
+          )}
         </div>
       </div>
 
@@ -443,7 +469,7 @@ export default function BacklogView() {
 
                     {/* Status */}
                     <td className="px-3 py-2.5 w-32" onClick={e => e.stopPropagation()}>
-                      <StatusSelect value={task.status} onChange={val => handleStatusChange(task.id, val)} />
+                      <StatusSelect value={task.status} onChange={val => handleStatusChange(task.id, val)} columns={kanbanColumns} />
                     </td>
 
                     {/* Priority */}
@@ -593,8 +619,10 @@ export default function BacklogView() {
             projectId={projectId}
             members={members}
             labels={labels}
-            onSave={handleSave}
-            onDelete={selectedTask?.id ? () => handleDelete(selectedTask.id) : null}
+            columnOptions={kanbanColumns.map(c => ({ value: c.id, label: c.label }))}
+            readOnly={!canEdit}
+            onSave={canEdit ? handleSave : undefined}
+            onDelete={canEdit && selectedTask?.id ? () => handleDelete(selectedTask.id) : null}
             onCancel={() => { setShowModal(false); setSelectedTask(null); }}
             onCommentAdded={(_, comment) => {
               setSelectedTask(prev => prev ? { ...prev, comments: [...(prev.comments || []), comment] } : prev);

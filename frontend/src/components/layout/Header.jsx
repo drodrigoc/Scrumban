@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, X, CheckCheck, Sun, Moon, KeyRound, LogOut, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { Menu, Bell, CheckCheck, Sun, Moon, KeyRound, LogOut, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { notificationsAPI, authAPI } from '../../services/api';
@@ -17,7 +17,6 @@ export default function Header({ onMenuClick }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
   const [showNotif, setShowNotif]         = useState(false);
-  const [search, setSearch]               = useState('');
 
   const [showUserMenu, setShowUserMenu]   = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
@@ -86,25 +85,6 @@ export default function Header({ onMenuClick }) {
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        {/* Search */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar proyectos, tareas..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-gray-700 transition-colors"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
 
         <div className="flex items-center gap-2 ml-auto">
 

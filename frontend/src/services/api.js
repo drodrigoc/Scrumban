@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// En desarrollo: usa el proxy de Vite → '/api'
+// En producción: usa la URL del backend desplegado → VITE_API_URL/api
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: BASE,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -62,6 +68,7 @@ export const projectsAPI = {
   update: (id, data) => api.put(`/projects/${id}`, data),
   delete: (id) => api.delete(`/projects/${id}`),
   addMember: (id, data) => api.post(`/projects/${id}/members`, data),
+  updateMemberRole: (id, userId, role) => api.patch(`/projects/${id}/members/${userId}/role`, { role }),
   removeMember: (id, userId) => api.delete(`/projects/${id}/members/${userId}`),
   getLabels: (id) => api.get(`/projects/${id}/labels`),
   createLabel: (id, data) => api.post(`/projects/${id}/labels`, data),
@@ -103,6 +110,20 @@ export const notificationsAPI = {
 // Dashboard
 export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats'),
+};
+
+// SGC - Sistema de Gestión de Calidad
+export const sgcAPI = {
+  getAll:         ()         => api.get('/sgc'),
+  getAllWithTasks: ()         => api.get('/sgc/with-tasks'),
+  create:         (data)     => api.post('/sgc', data),
+  update:         (id, data) => api.put(`/sgc/${id}`, data),
+  delete:         (id)       => api.delete(`/sgc/${id}`),
+};
+
+// My Tasks (tareas del usuario autenticado en todos los proyectos)
+export const myTasksAPI = {
+  getAll: (params) => api.get('/my-tasks', { params }),
 };
 
 export default api;
