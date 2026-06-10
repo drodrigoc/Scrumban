@@ -22,7 +22,7 @@ import SGCAdmin from './pages/SGCAdmin';
 import MyTasks from './pages/MyTasks';
 import NotFound from './pages/NotFound';
 
-function PrivateRoute({ children, roles }) {
+function PrivateRoute({ children, roles, allowSGC }) {
   const { user, loading } = useAuth();
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -30,7 +30,11 @@ function PrivateRoute({ children, roles }) {
     </div>
   );
   if (!user) return <Navigate to="/login" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
+  if (roles) {
+    const hasRole = roles.includes(user.role);
+    const hasSGC  = allowSGC && !!user.sgc_access;
+    if (!hasRole && !hasSGC) return <Navigate to="/" replace />;
+  }
   return children;
 }
 
@@ -66,7 +70,7 @@ function AppRoutes() {
           </PrivateRoute>
         } />
         <Route path="sgc" element={
-          <PrivateRoute roles={['admin', 'superViewer']}>
+          <PrivateRoute roles={['admin', 'superViewer']} allowSGC>
             <SGCAdmin />
           </PrivateRoute>
         } />
