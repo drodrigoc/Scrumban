@@ -13,7 +13,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ING RODRIGO CENTENO\\\\Documents\\\\Sistemas\\\\Srumban\\\\Scrumban\\\\frontend\\\\src\" -Recurse -File)",
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem -Recurse)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(npm list *)",
+      "Bash(cd \"C:\\\\Users\\\\ING RODRIGO CENTENO\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\bd598901-a621-4de4-ab6d-f67207c5a2d0\\\\de38fe5e-3bc6-4d46-b1a6-a8b012b63e81\\\\skills\\\\docx\" && ls)"
     ]
   }
 }
