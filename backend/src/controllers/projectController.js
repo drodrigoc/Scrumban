@@ -10,7 +10,7 @@ exports.getAll = async (req, res) => {
       query = `
         SELECT p.*, u.name as owner_name,
           COUNT(DISTINCT t.id) as total_tasks,
-          SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+          COALESCE(AVG(DISTINCT t.progress), 0) as avg_progress,
           COUNT(DISTINCT pm.user_id) as member_count
         FROM projects p
         LEFT JOIN users u ON p.owner_id = u.id
@@ -23,7 +23,7 @@ exports.getAll = async (req, res) => {
       query = `
         SELECT p.*, u.name as owner_name,
           COUNT(DISTINCT t.id) as total_tasks,
-          SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+          COALESCE(AVG(DISTINCT t.progress), 0) as avg_progress,
           COUNT(DISTINCT pm.user_id) as member_count
         FROM projects p
         LEFT JOIN users u ON p.owner_id = u.id
@@ -40,12 +40,10 @@ exports.getAll = async (req, res) => {
 
     const [projects] = await db.query(query, params);
 
-    // Calcular progreso basado en tareas
+    // Calcular progreso basado en el promedio del campo progress de las tareas
     const enriched = projects.map(p => ({
       ...p,
-      progress: p.total_tasks > 0
-        ? Math.round((p.completed_tasks / p.total_tasks) * 100)
-        : p.progress,
+      progress: p.total_tasks > 0 ? Math.round(p.avg_progress) : (p.progress || 0),
     }));
 
     res.json(enriched);
@@ -83,9 +81,14 @@ exports.getById = async (req, res) => {
       [req.params.id]
     );
 
-    // Contar tareas por estado
+    // Contar tareas por estado y calcular progreso promedio
     const [taskStats] = await db.query(
       `SELECT status, COUNT(*) as count FROM tasks WHERE project_id = ? GROUP BY status`,
+      [req.params.id]
+    );
+
+    const [progressResult] = await db.query(
+      `SELECT COUNT(*) as total, COALESCE(AVG(progress), 0) as avg_progress FROM tasks WHERE project_id = ?`,
       [req.params.id]
     );
 
@@ -95,7 +98,8 @@ exports.getById = async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo) });
+    const avgProgress = progressResult[0].total > 0 ? Math.round(progressResult[0].avg_progress) : 0;
+    res.json({ ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo), avg_progress: avgProgress });
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al obtener proyecto' });
