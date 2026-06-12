@@ -83,7 +83,8 @@ export default function ProjectDetail() {
   const st = statusConfig[project.status] || statusConfig.active;
   const taskStats = project.taskStats || [];
   const totalTasks = taskStats.reduce((sum, s) => sum + s.count, 0);
-  const progress = project.avg_progress ?? 0;
+  const completedTasks = taskStats.find(s => s.status === 'completed')?.count || 0;
+  const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const myProjectRole = project.members?.find(m => m.id === user?.id)?.project_role;
   const canEdit = user?.role === 'admin'
     || user?.role === 'coordinator'
@@ -140,7 +141,7 @@ export default function ProjectDetail() {
         </div>
         {[
           { label: 'Total Tareas', value: totalTasks },
-          { label: 'Progreso', value: `${progress}%` },
+          { label: 'Completadas', value: completedTasks },
           { label: 'Miembros', value: project.members?.length || 0 },
         ].map(s => (
           <div key={s.label} className="card p-4 text-center">

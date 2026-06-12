@@ -112,7 +112,7 @@ export default function Projects() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(p => {
             const st = statusConfig[p.status] || statusConfig.active;
-            const progress = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : p.progress || 0;
+            const progress = p.progress ?? 0;
             return (
               <div key={p.id} className="card p-5 hover:shadow-md dark:hover:shadow-gray-900/50 transition-shadow group relative">
                 <div className="flex items-start justify-between mb-3">

@@ -7,10 +7,13 @@ import {
   PointerSensor, useSensor, useSensors,
   useDroppable,
 } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import {
+  SortableContext, verticalListSortingStrategy,
+  horizontalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { tasksAPI, projectsAPI, usersAPI } from '../services/api';
-import { Plus, Filter, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Filter, Pencil, Trash2, Check, X, GripVertical, Lock } from 'lucide-react';
 import TaskCard from '../components/tasks/TaskCard';
 import TaskModal from '../components/tasks/TaskModal';
 import Modal from '../components/common/Modal';
@@ -37,12 +40,37 @@ const COLOR_OPTIONS = [
 ];
 
 const STORAGE_KEY = (projectId) => `kanban_columns_${projectId}`;
+const COMPLETED_ID = 'completed';
 
 // ---------------------------------------------------------------------------
 // DroppableColumn
 // ---------------------------------------------------------------------------
 function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRename, onDelete }) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const isLocked = column.id === COMPLETED_ID;
+
+  // Sortable handle for column reordering
+  const {
+    attributes: colAttrs,
+    listeners: colListeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging: isColDragging,
+  } = useSortable({
+    id: `col_${column.id}`,
+    data: { type: 'column', columnId: column.id },
+    disabled: isLocked,
+  });
+
+  // Droppable zone for tasks
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: column.id });
+
+  const colStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isColDragging ? 0.4 : 1,
+  };
+
   const [editing, setEditing] = useState(false);
   const [labelDraft, setLabelDraft] = useState(column.label);
   const inputRef = useRef(null);
@@ -68,11 +96,26 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
   };
 
   return (
-    <div className="flex flex-col min-w-72 w-72 group/col">
+    <div ref={setSortableRef} style={colStyle} className="flex flex-col min-w-72 w-72 group/col">
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 min-h-8">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          {/* Drag handle or lock icon */}
+          {isLocked ? (
+            <Lock className="w-3 h-3 text-green-500 flex-shrink-0" title="Columna bloqueada" />
+          ) : (
+            <div
+              {...colAttrs}
+              {...colListeners}
+              className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 flex-shrink-0 p-0.5 -ml-0.5"
+              title="Mover columna"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </div>
+          )}
+
           <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${column.color}`} />
+
           {editing ? (
             <div className="flex items-center gap-1 flex-1">
               <input
@@ -106,20 +149,24 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
 
         {!editing && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover/col:opacity-100 transition-opacity flex-shrink-0">
-            <button
-              onClick={startEdit}
-              title="Renombrar columna"
-              className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => onDelete(column.id)}
-              title="Eliminar columna"
-              className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {!isLocked && (
+              <>
+                <button
+                  onClick={startEdit}
+                  title="Renombrar columna"
+                  className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onDelete(column.id)}
+                  title="Eliminar columna"
+                  className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
             {onAddTask && (
               <button
                 onClick={() => onAddTask(column.id)}
@@ -136,7 +183,7 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
       {/* Drop zone */}
       <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
         <div
-          ref={setNodeRef}
+          ref={setDropRef}
           className={`flex-1 space-y-2 min-h-20 rounded-xl p-2 transition-all duration-150 ${
             isOver
               ? `bg-primary-50 dark:bg-primary-950/40 ring-2 ${column.ring} ring-inset ring-opacity-60`
@@ -209,7 +256,6 @@ function AddColumnPanel({ onAdd }) {
           placeholder="Nombre de la columna…"
           className="input py-1.5 text-sm w-full"
         />
-        {/* Color picker */}
         <div className="flex flex-wrap gap-2">
           {COLOR_OPTIONS.map(opt => (
             <button
@@ -225,10 +271,7 @@ function AddColumnPanel({ onAdd }) {
           ))}
         </div>
         <div className="flex gap-2 justify-end pt-1">
-          <button
-            onClick={() => setOpen(false)}
-            className="btn-secondary text-xs py-1 px-3"
-          >
+          <button onClick={() => setOpen(false)} className="btn-secondary text-xs py-1 px-3">
             Cancelar
           </button>
           <button
@@ -251,7 +294,7 @@ function SortableTaskCard({ task, onClick }) {
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: task.id, data: { type: 'task' } });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -280,6 +323,7 @@ export default function KanbanBoard() {
   const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState(null);
+  const [activeColumnId, setActiveColumnId] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState('pending');
@@ -351,6 +395,7 @@ export default function KanbanBoard() {
   }, []);
 
   const handleDeleteColumn = useCallback((colId) => {
+    if (colId === COMPLETED_ID) return;
     const tasksInCol = tasksRef.current.filter(t => t.status === colId);
     if (tasksInCol.length > 0) {
       toast.warning(
@@ -364,19 +409,36 @@ export default function KanbanBoard() {
 
   const handleAddColumn = useCallback(({ label, color, ring }) => {
     const id = `col_${Date.now()}`;
-    setColumns(prev => [...prev, { id, label, color, ring }]);
+    // Insert before the 'completed' column so it stays last
+    setColumns(prev => {
+      const completedIdx = prev.findIndex(c => c.id === COMPLETED_ID);
+      const newCol = { id, label, color, ring };
+      if (completedIdx === -1) return [...prev, newCol];
+      const next = [...prev];
+      next.splice(completedIdx, 0, newCol);
+      return next;
+    });
   }, []);
 
   // --- Drag handlers ---
 
   const handleDragStart = useCallback(({ active }) => {
-    const task = tasksRef.current.find(t => t.id === active.id);
-    setActiveTask(task || null);
-    dragOriginRef.current = task?.status ?? null;
+    const type = active.data.current?.type;
+    if (type === 'column') {
+      setActiveColumnId(active.data.current.columnId);
+      setActiveTask(null);
+    } else {
+      const task = tasksRef.current.find(t => t.id === active.id);
+      setActiveTask(task || null);
+      setActiveColumnId(null);
+      dragOriginRef.current = task?.status ?? null;
+    }
   }, []);
 
   const handleDragOver = useCallback(({ active, over }) => {
+    if (active.data.current?.type === 'column') return;
     if (!over) return;
+
     const current = tasksRef.current;
     const activeT = current.find(t => t.id === active.id);
     if (!activeT) return;
@@ -392,7 +454,28 @@ export default function KanbanBoard() {
     );
   }, []);
 
-  const handleDragEnd = useCallback(async ({ active }) => {
+  const handleDragEnd = useCallback(async ({ active, over }) => {
+    const type = active.data.current?.type;
+
+    // --- Column reorder ---
+    if (type === 'column') {
+      setActiveColumnId(null);
+      if (!over) return;
+      const activeColId = active.data.current.columnId;
+      const overColId = over.data.current?.columnId
+        ?? (String(over.id).startsWith('col_') ? String(over.id).replace('col_', '') : null);
+      if (!overColId || activeColId === overColId) return;
+
+      setColumns(prev => {
+        const oldIdx = prev.findIndex(c => c.id === activeColId);
+        const newIdx = prev.findIndex(c => c.id === overColId);
+        if (oldIdx === -1 || newIdx === -1) return prev;
+        return arrayMove(prev, oldIdx, newIdx);
+      });
+      return;
+    }
+
+    // --- Task move ---
     const movedTask = tasksRef.current.find(t => t.id === active.id);
     const originalStatus = dragOriginRef.current;
     dragOriginRef.current = null;
@@ -400,8 +483,19 @@ export default function KanbanBoard() {
 
     if (!movedTask || movedTask.status === originalStatus) return;
 
+    const movingToCompleted = movedTask.status === COMPLETED_ID;
+    const updatePayload = {
+      status: movedTask.status,
+      ...(movingToCompleted ? { progress: 100 } : {}),
+    };
+
     try {
-      await tasksAPI.update(projectId, active.id, { status: movedTask.status });
+      await tasksAPI.update(projectId, active.id, updatePayload);
+      if (movingToCompleted) {
+        setTasks(prev =>
+          prev.map(t => t.id === active.id ? { ...t, progress: 100 } : t)
+        );
+      }
     } catch {
       setTasks(prev =>
         prev.map(t => t.id === active.id ? { ...t, status: originalStatus } : t)
@@ -415,6 +509,7 @@ export default function KanbanBoard() {
     const activeId = activeTask?.id;
     dragOriginRef.current = null;
     setActiveTask(null);
+    setActiveColumnId(null);
     if (activeId && originalStatus) {
       setTasks(prev =>
         prev.map(t => t.id === activeId ? { ...t, status: originalStatus } : t)
@@ -472,6 +567,9 @@ export default function KanbanBoard() {
     </div>
   );
 
+  const columnSortIds = columns.map(c => `col_${c.id}`);
+  const activeColumn = activeColumnId ? columns.find(c => c.id === activeColumnId) : null;
+
   return (
     <div className="flex flex-col h-full animate-fade-in">
       <ViewNavBar projectName={project?.name} projectColor={project?.color} />
@@ -515,26 +613,38 @@ export default function KanbanBoard() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="flex gap-4 min-h-full h-full items-start">
-            {columns.map(col => (
-              <DroppableColumn
-                key={col.id}
-                column={col}
-                tasks={getColumnTasks(col.id)}
-                activeId={activeTask?.id ?? null}
-                onAddTask={canEdit ? handleAddTask : null}
-                onTaskClick={handleTaskClick}
-                onRename={handleRenameColumn}
-                onDelete={handleDeleteColumn}
-              />
-            ))}
-            <AddColumnPanel onAdd={handleAddColumn} />
-          </div>
+          <SortableContext items={columnSortIds} strategy={horizontalListSortingStrategy}>
+            <div className="flex gap-4 min-h-full h-full items-start">
+              {columns.map(col => (
+                <DroppableColumn
+                  key={col.id}
+                  column={col}
+                  tasks={getColumnTasks(col.id)}
+                  activeId={activeTask?.id ?? null}
+                  onAddTask={canEdit ? handleAddTask : null}
+                  onTaskClick={handleTaskClick}
+                  onRename={handleRenameColumn}
+                  onDelete={handleDeleteColumn}
+                />
+              ))}
+              <AddColumnPanel onAdd={handleAddColumn} />
+            </div>
+          </SortableContext>
 
           <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
             {activeTask && (
               <div className="rotate-2 scale-105 shadow-2xl ring-2 ring-primary-400 rounded-xl">
                 <TaskCard task={activeTask} />
+              </div>
+            )}
+            {activeColumn && (
+              <div className="flex flex-col min-w-72 w-72 opacity-90 shadow-2xl ring-2 ring-primary-400 rounded-xl bg-white dark:bg-gray-900 p-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${activeColumn.color}`} />
+                  <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                    {activeColumn.label}
+                  </span>
+                </div>
               </div>
             )}
           </DragOverlay>
