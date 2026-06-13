@@ -322,16 +322,15 @@ exports.uploadAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
 
-    const filepath = `tasks/${req.file.filename}`;
     const [result] = await db.query(
       'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, filepath, req.file.size, req.file.mimetype, 'task']
+      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'task']
     );
 
     res.status(201).json({
       id: result.insertId,
       filename: req.file.originalname,
-      filepath,
+      filepath: req.file.filename,
       filesize: req.file.size,
       mimetype: req.file.mimetype,
       category: 'task',
@@ -361,16 +360,15 @@ exports.uploadSGCAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
 
-    const filepath = `sgc/${req.file.filename}`;
     const [result] = await db.query(
       'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, filepath, req.file.size, req.file.mimetype, 'sgc']
+      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'sgc']
     );
 
     res.status(201).json({
       id: result.insertId,
       filename: req.file.originalname,
-      filepath,
+      filepath: req.file.filename,
       filesize: req.file.size,
       mimetype: req.file.mimetype,
       category: 'sgc',

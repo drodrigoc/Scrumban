@@ -6,9 +6,11 @@ const BACKEND_ORIGIN = import.meta.env.VITE_API_URL || '';
 const BASE = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api` : '/api';
 
 // Construye la URL absoluta de un archivo adjunto
-// filepath ya incluye el subdirectorio (ej: "tasks/abc.pdf" o "sgc/abc.pdf")
-export const getUploadUrl = (filepath) =>
-  `${BACKEND_ORIGIN}/uploads/${filepath}`;
+// category: 'task' → carpeta tasks/, 'sgc' → carpeta sgc/
+export const getUploadUrl = (category, filepath) => {
+  const folder = category === 'sgc' ? 'sgc' : 'tasks';
+  return `${BACKEND_ORIGIN}/uploads/${folder}/${filepath}`;
+};
 
 const api = axios.create({
   baseURL: BASE,
