@@ -131,6 +131,7 @@ CREATE TABLE task_attachments (
   filepath   VARCHAR(500) NOT NULL,
   filesize   INT DEFAULT NULL,
   mimetype   VARCHAR(100) DEFAULT NULL,
+  category   VARCHAR(20) NOT NULL DEFAULT 'task',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (task_id) REFERENCES tasks(id)  ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id)  ON DELETE CASCADE

@@ -88,6 +88,10 @@ export const tasksAPI = {
     api.post(`/projects/${projectId}/tasks/${id}/attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   deleteAttachment: (projectId, id, attachmentId) =>
     api.delete(`/projects/${projectId}/tasks/${id}/attachments/${attachmentId}`),
+  uploadSGCAttachment: (projectId, id, formData) =>
+    api.post(`/projects/${projectId}/tasks/${id}/sgc-attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteSGCAttachment: (projectId, id, attachmentId) =>
+    api.delete(`/projects/${projectId}/tasks/${id}/sgc-attachments/${attachmentId}`),
   // Checklist
   getChecklist: (projectId, taskId) =>
     api.get(`/projects/${projectId}/tasks/${taskId}/checklist`),

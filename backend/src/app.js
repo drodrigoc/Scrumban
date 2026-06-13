@@ -30,7 +30,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(httpLogger);
 
 // Servir archivos estáticos (adjuntos)
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads/tasks', express.static(path.join(__dirname, '..', 'uploads', 'tasks')));
+app.use('/uploads/sgc',   express.static(path.join(__dirname, '..', 'uploads', 'sgc')));
+app.use('/uploads',       express.static(path.join(__dirname, '..', 'uploads')));
 
 // Rutas
 app.use('/api/auth', require('./routes/auth'));

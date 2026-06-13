@@ -345,7 +345,6 @@ function GestionTab({ evidencias, setEvidencias }) {
 function VisualizacionTab() {
   const [data, setData]         = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [expanded, setExpanded] = useState({});
   const [search, setSearch]             = useState('');
   const [filterDimension, setFilterDim] = useState('');
   const [filterCriterio, setFilterCrit] = useState('');
@@ -358,8 +357,6 @@ function VisualizacionTab() {
       .catch(() => toast.error('Error al cargar visualización'))
       .finally(() => setLoading(false));
   }, []);
-
-  const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
   const handleViewTask = async (task) => {
     setLoadingTask(true);
@@ -447,17 +444,11 @@ function VisualizacionTab() {
           <p className="text-sm">No hay evidencias que mostrar.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filtered.map(e => (
             <div key={e.id} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-              <button
-                onClick={() => toggle(e.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 text-left transition-colors"
-              >
-                {expanded[e.id]
-                  ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                }
+              {/* Encabezado de evidencia — siempre visible */}
+              <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800">
                 <span className="font-mono font-bold text-primary-600 dark:text-primary-400 text-sm w-14 flex-shrink-0">{e.evidencia}</span>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm truncate">{e.nombre_evidencia}</p>
@@ -466,31 +457,35 @@ function VisualizacionTab() {
                 <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full flex-shrink-0">
                   {e.tasks.length} tarea{e.tasks.length !== 1 ? 's' : ''}
                 </span>
-              </button>
+              </div>
 
-              {expanded[e.id] && (
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {e.tasks.length === 0 ? (
-                    <p className="px-6 py-4 text-sm text-gray-400 dark:text-gray-500 italic">
-                      Sin tareas vinculadas aún.
-                    </p>
-                  ) : e.tasks.map(t => (
-                    <button key={t.id} onClick={() => handleViewTask(t)} disabled={loadingTask} className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-left cursor-pointer">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{t.title}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                          {t.project_name}
-                          {t.assignee_name ? ` · ${t.assignee_name}` : ''}
-                          {t.due_date ? ` · Vence ${new Date(t.due_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
-                        </p>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${statusColors[t.status] || statusColors.pending}`}>
-                        {statusLabels[t.status] || t.status}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* Tareas — siempre visibles */}
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {e.tasks.length === 0 ? (
+                  <p className="px-6 py-3 text-sm text-gray-400 dark:text-gray-500 italic">
+                    Sin tareas vinculadas aún.
+                  </p>
+                ) : e.tasks.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleViewTask(t)}
+                    disabled={loadingTask}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{t.title}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                        {t.project_name}
+                        {t.assignee_name ? ` · ${t.assignee_name}` : ''}
+                        {t.due_date ? ` · Vence ${new Date(t.due_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${statusColors[t.status] || statusColors.pending}`}>
+                      {statusLabels[t.status] || t.status}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
         </div>

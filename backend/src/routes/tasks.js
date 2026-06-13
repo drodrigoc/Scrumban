@@ -1,7 +1,7 @@
 const router = require('express').Router({ mergeParams: true });
 const ctrl = require('../controllers/taskController');
 const { authenticate, denyProjectViewer } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { uploadTask, uploadSGC } = require('../middleware/upload');
 
 router.use(authenticate);
 
@@ -18,7 +18,10 @@ router.delete('/:id',         denyProjectViewer, ctrl.delete);
 router.post('/:id/comments',                denyProjectViewer, ctrl.addComment);
 router.delete('/:id/comments/:commentId',   denyProjectViewer, ctrl.deleteComment);
 
-router.post('/:id/attachments', denyProjectViewer, upload.single('file'), ctrl.uploadAttachment);
-router.delete('/:id/attachments/:attachmentId', denyProjectViewer, ctrl.deleteAttachment);
+router.post('/:id/attachments',                    denyProjectViewer, uploadTask.single('file'), ctrl.uploadAttachment);
+router.delete('/:id/attachments/:attachmentId',    denyProjectViewer, ctrl.deleteAttachment);
+
+router.post('/:id/sgc-attachments',                denyProjectViewer, uploadSGC.single('file'), ctrl.uploadSGCAttachment);
+router.delete('/:id/sgc-attachments/:attachmentId', denyProjectViewer, ctrl.deleteSGCAttachment);
 
 module.exports = router;

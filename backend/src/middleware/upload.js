@@ -2,19 +2,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadsDir = process.env.UPLOAD_PATH || './uploads';
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const baseDir = process.env.UPLOAD_PATH || './uploads';
+const tasksDir = path.join(baseDir, 'tasks');
+const sgcDir   = path.join(baseDir, 'sgc');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
+[baseDir, tasksDir, sgcDir].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
 const fileFilter = (req, file, cb) => {
@@ -28,17 +21,21 @@ const fileFilter = (req, file, cb) => {
     'text/plain', 'text/csv',
     'application/zip',
   ];
-  if (allowed.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Tipo de archivo no permitido'), false);
-  }
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Tipo de archivo no permitido'), false);
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 },
+const limits = { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 };
+
+const makeStorage = (dest) => multer.diskStorage({
+  destination: (req, file, cb) => cb(null, dest),
+  filename:    (req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, unique + path.extname(file.originalname));
+  },
 });
 
-module.exports = upload;
+const uploadTask = multer({ storage: makeStorage(tasksDir), fileFilter, limits });
+const uploadSGC  = multer({ storage: makeStorage(sgcDir),   fileFilter, limits });
+
+module.exports = { uploadTask, uploadSGC };

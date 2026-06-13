@@ -96,7 +96,13 @@ exports.getById = async (req, res) => {
     const [attachments] = await db.query(`
       SELECT ta.*, u.name as uploaded_by_name
       FROM task_attachments ta JOIN users u ON u.id = ta.user_id
-      WHERE ta.task_id = ? ORDER BY ta.created_at DESC
+      WHERE ta.task_id = ? AND ta.category = 'task' ORDER BY ta.created_at DESC
+    `, [req.params.id]);
+
+    const [sgcAttachments] = await db.query(`
+      SELECT ta.*, u.name as uploaded_by_name
+      FROM task_attachments ta JOIN users u ON u.id = ta.user_id
+      WHERE ta.task_id = ? AND ta.category = 'sgc' ORDER BY ta.created_at DESC
     `, [req.params.id]);
 
     const [history] = await db.query(`
@@ -116,7 +122,7 @@ exports.getById = async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ ...tasks[0], labels, comments, attachments, history, dependencies: deps, sgc_evidencias: sgcEvidencias });
+    res.json({ ...tasks[0], labels, comments, attachments, sgc_attachments: sgcAttachments, history, dependencies: deps, sgc_evidencias: sgcEvidencias });
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al obtener tarea' });
@@ -308,13 +314,17 @@ exports.deleteComment = async (req, res) => {
   }
 };
 
+const fs   = require('fs');
+const path = require('path');
+const BASE_UPLOAD = process.env.UPLOAD_PATH || './uploads';
+
 exports.uploadAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
 
     const [result] = await db.query(
-      'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype]
+      'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'task']
     );
 
     res.status(201).json({
@@ -323,6 +333,7 @@ exports.uploadAttachment = async (req, res) => {
       filepath: req.file.filename,
       filesize: req.file.size,
       mimetype: req.file.mimetype,
+      category: 'task',
     });
   } catch (error) {
     logger.error(error);
@@ -332,18 +343,54 @@ exports.uploadAttachment = async (req, res) => {
 
 exports.deleteAttachment = async (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ?', [req.params.attachmentId]);
+    const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'task']);
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const filePath = path.join(process.env.UPLOAD_PATH || './uploads', attachments[0].filepath);
+    const filePath = path.join(BASE_UPLOAD, 'tasks', attachments[0].filepath);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await db.query('DELETE FROM task_attachments WHERE id = ?', [req.params.attachmentId]);
     res.json({ message: 'Archivo eliminado' });
   } catch (error) {
     res.status(500).json({ message: 'Error al eliminar archivo' });
+  }
+};
+
+exports.uploadSGCAttachment = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
+
+    const [result] = await db.query(
+      'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'sgc']
+    );
+
+    res.status(201).json({
+      id: result.insertId,
+      filename: req.file.originalname,
+      filepath: req.file.filename,
+      filesize: req.file.size,
+      mimetype: req.file.mimetype,
+      category: 'sgc',
+    });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al subir archivo SGC' });
+  }
+};
+
+exports.deleteSGCAttachment = async (req, res) => {
+  try {
+    const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'sgc']);
+    if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
+
+    const filePath = path.join(BASE_UPLOAD, 'sgc', attachments[0].filepath);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    await db.query('DELETE FROM task_attachments WHERE id = ?', [req.params.attachmentId]);
+    res.json({ message: 'Archivo eliminado' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al eliminar archivo SGC' });
   }
 };
 
