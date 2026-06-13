@@ -322,15 +322,16 @@ exports.uploadAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
 
+    const filepath = `tasks/${req.file.filename}`;
     const [result] = await db.query(
       'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'task']
+      [req.params.id, req.user.id, req.file.originalname, filepath, req.file.size, req.file.mimetype, 'task']
     );
 
     res.status(201).json({
       id: result.insertId,
       filename: req.file.originalname,
-      filepath: req.file.filename,
+      filepath,
       filesize: req.file.size,
       mimetype: req.file.mimetype,
       category: 'task',
@@ -346,7 +347,7 @@ exports.deleteAttachment = async (req, res) => {
     const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'task']);
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const filePath = path.join(BASE_UPLOAD, 'tasks', attachments[0].filepath);
+    const filePath = path.join(BASE_UPLOAD, attachments[0].filepath);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await db.query('DELETE FROM task_attachments WHERE id = ?', [req.params.attachmentId]);
@@ -360,15 +361,16 @@ exports.uploadSGCAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
 
+    const filepath = `sgc/${req.file.filename}`;
     const [result] = await db.query(
       'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'sgc']
+      [req.params.id, req.user.id, req.file.originalname, filepath, req.file.size, req.file.mimetype, 'sgc']
     );
 
     res.status(201).json({
       id: result.insertId,
       filename: req.file.originalname,
-      filepath: req.file.filename,
+      filepath,
       filesize: req.file.size,
       mimetype: req.file.mimetype,
       category: 'sgc',
@@ -384,7 +386,7 @@ exports.deleteSGCAttachment = async (req, res) => {
     const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'sgc']);
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const filePath = path.join(BASE_UPLOAD, 'sgc', attachments[0].filepath);
+    const filePath = path.join(BASE_UPLOAD, attachments[0].filepath);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await db.query('DELETE FROM task_attachments WHERE id = ?', [req.params.attachmentId]);

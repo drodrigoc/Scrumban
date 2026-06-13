@@ -29,10 +29,8 @@ app.use(express.urlencoded({ extended: true }));
 // ── HTTP request logging ──────────────────────────────────────────────────
 app.use(httpLogger);
 
-// Servir archivos estáticos (adjuntos)
-app.use('/uploads/tasks', express.static(path.join(__dirname, '..', 'uploads', 'tasks')));
-app.use('/uploads/sgc',   express.static(path.join(__dirname, '..', 'uploads', 'sgc')));
-app.use('/uploads',       express.static(path.join(__dirname, '..', 'uploads')));
+// Servir archivos estáticos — un solo punto de entrada cubre tasks/ y sgc/
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Rutas
 app.use('/api/auth', require('./routes/auth'));
