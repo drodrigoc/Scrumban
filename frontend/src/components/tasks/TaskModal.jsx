@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { tasksAPI, projectsAPI, sgcAPI } from '../../services/api';
+import { tasksAPI, projectsAPI, sgcAPI, getUploadUrl } from '../../services/api';
 import {
   Trash2, Send, Paperclip, Clock, Tag, User, Calendar,
   AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck,
@@ -50,7 +50,7 @@ function AttachmentsTab({ task, projectId, readOnly }) {
             <p className="text-xs text-gray-400">Por {a.uploaded_by_name}</p>
           </div>
           <a
-            href={`/uploads/tasks/${a.filepath}`}
+            href={getUploadUrl('tasks', a.filepath)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
@@ -644,7 +644,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                   <p className="text-xs text-gray-400">Por {a.uploaded_by_name}</p>
                 </div>
                 <a
-                  href={`/uploads/sgc/${a.filepath}`}
+                  href={getUploadUrl('sgc', a.filepath)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-green-600 dark:text-green-400 hover:underline flex-shrink-0"

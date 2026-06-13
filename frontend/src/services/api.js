@@ -2,9 +2,12 @@ import axios from 'axios';
 
 // En desarrollo: usa el proxy de Vite → '/api'
 // En producción: usa la URL del backend desplegado → VITE_API_URL/api
-const BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';
+const BACKEND_ORIGIN = import.meta.env.VITE_API_URL || '';
+const BASE = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api` : '/api';
+
+// Construye la URL absoluta de un archivo adjunto
+export const getUploadUrl = (category, filepath) =>
+  `${BACKEND_ORIGIN}/uploads/${category}/${filepath}`;
 
 const api = axios.create({
   baseURL: BASE,
