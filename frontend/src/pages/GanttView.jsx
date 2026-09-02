@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { tasksAPI, projectsAPI } from '../services/api';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { tasksAPI, projectsAPI, phasesAPI } from '../services/api';
+import { fetchKanbanColumns } from '../services/columns';
+import { ChevronLeft, ChevronRight, AlertTriangle, Layers } from 'lucide-react';
 import ViewNavBar from '../components/common/ViewNavBar';
 import {
   addWeeks, subWeeks, startOfWeek, format,
@@ -35,6 +36,7 @@ function hexWithAlpha(hex, alpha) {
 export default function GanttView() {
   const { id: projectId } = useParams();
   const [tasks,      setTasks]      = useState([]);
+  const [phases,     setPhases]     = useState([]);
   const [project,    setProject]    = useState(null);
   const [columns,    setColumns]    = useState(DEFAULT_COLUMNS);
   const [loading,    setLoading]    = useState(true);
@@ -52,19 +54,23 @@ export default function GanttView() {
   }, []);
 
   useEffect(() => {
-    // Cargar columnas del proyecto desde localStorage
-    const saved = localStorage.getItem(`kanban_columns_${projectId}`);
-    if (saved) {
-      try { setColumns(JSON.parse(saved)); } catch { /* usa DEFAULT_COLUMNS */ }
-    }
+    // Columnas del proyecto (compartidas por el equipo, desde la BD)
+    fetchKanbanColumns(projectId)
+      .then(setColumns)
+      .catch(() => { /* usa DEFAULT_COLUMNS */ });
 
-    Promise.all([tasksAPI.getByProject(projectId), projectsAPI.getById(projectId)])
-      .then(([t, p]) => {
+    Promise.all([
+      tasksAPI.getByProject(projectId),
+      projectsAPI.getById(projectId),
+      phasesAPI.getAll(projectId),
+    ])
+      .then(([t, p, ph]) => {
         const sorted = t.data
           .filter(task => task.start_date || task.due_date)
           .sort((a, b) => new Date(a.start_date || a.due_date) - new Date(b.start_date || b.due_date));
         setTasks(sorted);
         setProject(p.data);
+        setPhases(ph.data.filter(f => f.start_date || f.end_date));
       }).catch(() => toast.error('Error al cargar cronograma'))
       .finally(() => setLoading(false));
   }, [projectId]);
@@ -84,9 +90,10 @@ export default function GanttView() {
     });
   }, [viewStart, weeksCount]);
 
-  const getBarStyle = (task) => {
-    const start = task.start_date ? parseISO(task.start_date) : (task.due_date ? parseISO(task.due_date) : null);
-    const end   = task.due_date   ? parseISO(task.due_date)   : start;
+  // Geometría de una barra dentro de la escala de tiempo visible
+  const getRange = (startRaw, endRaw) => {
+    const start = startRaw ? parseISO(startRaw) : (endRaw ? parseISO(endRaw) : null);
+    const end   = endRaw   ? parseISO(endRaw)   : start;
     if (!start || !end) return null;
 
     const clampedStart = isBefore(start, viewStart) ? viewStart : start;
@@ -95,10 +102,21 @@ export default function GanttView() {
 
     const offsetDays   = Math.max(0, differenceInDays(clampedStart, viewStart));
     const durationDays = Math.max(1, differenceInDays(clampedEnd, clampedStart) + 1);
-    const left  = (offsetDays   / totalDays) * 100;
-    const width = (durationDays / totalDays) * 100;
 
-    const isOverdue = isBefore(end, new Date()) && task.status !== 'completed';
+    return {
+      left:  `${(offsetDays / totalDays) * 100}%`,
+      width: `${Math.max((durationDays / totalDays) * 100, 1)}%`,
+    };
+  };
+
+  const getBarStyle = (task) => {
+    const range = getRange(task.start_date, task.due_date);
+    if (!range) return null;
+
+    const end = task.due_date
+      ? parseISO(task.due_date)
+      : (task.start_date ? parseISO(task.start_date) : null);
+    const isOverdue = end && isBefore(end, new Date()) && task.status !== 'completed';
 
     let bg, border;
     if (isOverdue) {
@@ -110,7 +128,7 @@ export default function GanttView() {
       border = priorityColors[task.priority] ?? '#6B7280';
     }
 
-    return { left: `${left}%`, width: `${Math.max(width, 1)}%`, bg, border };
+    return { ...range, bg, border };
   };
 
   if (loading) return (
@@ -160,9 +178,12 @@ export default function GanttView() {
         </span>
       </div>
 
-      {tasks.length === 0 ? (
+      {tasks.length === 0 && phases.length === 0 ? (
         <div className="card p-12 text-center">
-          <p className="text-gray-400 dark:text-gray-500">No hay tareas con fechas para mostrar en el cronograma.</p>
+          <p className="text-gray-400 dark:text-gray-500">No hay fases ni tareas con fechas para mostrar en el cronograma.</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            Define las fases macro del proyecto desde su ficha para ver el cronograma general.
+          </p>
         </div>
       ) : (
         <div className="card overflow-hidden">
@@ -194,6 +215,95 @@ export default function GanttView() {
                     style={{ left: `calc(224px + ${todayPercent}% * (100% - 224px) / 100)` }}>
                     <div className="w-2 h-2 bg-red-400 rounded-full -ml-0.5 -mt-1" />
                   </div>
+                )}
+
+                {/* Franja de fases — la vista macro del proyecto */}
+                {phases.length > 0 && (
+                  <>
+                    <div className="flex items-center border-b border-gray-100 dark:border-gray-800 bg-primary-50/50 dark:bg-primary-900/10">
+                      <div className="w-56 flex-shrink-0 px-3 py-1.5 border-r border-gray-100 dark:border-gray-700 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-primary-500" />
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          Fases
+                        </span>
+                      </div>
+                      <div className="flex-1" />
+                      <div className="w-12 flex-shrink-0" />
+                    </div>
+
+                    {phases.map(phase => {
+                      const range = getRange(phase.start_date, phase.end_date);
+                      const color = phase.color || '#6366F1';
+                      return (
+                        <div key={`phase-${phase.id}`} className="flex items-center border-b border-gray-100 dark:border-gray-800">
+                          <div className="w-56 flex-shrink-0 px-3 py-2.5 border-r border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate" title={phase.name}>
+                                {phase.name}
+                              </span>
+                            </div>
+                            {phase.total_tasks > 0 && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 pl-3.5">
+                                {phase.completed_tasks}/{phase.total_tasks} tareas
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex-1 relative h-11 px-1">
+                            <div className="absolute inset-0 flex pointer-events-none">
+                              {weeks.map((_, i) => (
+                                <div key={i} className="border-r border-gray-100 dark:border-gray-700/50 flex-1" />
+                              ))}
+                            </div>
+                            {range && (
+                              <div
+                                className="absolute top-1/2 -translate-y-1/2 h-7 rounded-md overflow-hidden border-2 flex items-center"
+                                style={{
+                                  left: range.left,
+                                  width: range.width,
+                                  backgroundColor: hexWithAlpha(color, isDark ? 0.22 : 0.15),
+                                  borderColor: color,
+                                }}
+                                title={`${phase.name} — ${phase.progress || 0}% de avance`}
+                              >
+                                {/* Relleno de avance dentro de la barra de fase */}
+                                <div
+                                  className="absolute inset-y-0 left-0"
+                                  style={{
+                                    width: `${phase.progress || 0}%`,
+                                    backgroundColor: hexWithAlpha(color, isDark ? 0.45 : 0.35),
+                                  }}
+                                />
+                                <span
+                                  className="relative truncate px-2 text-xs font-semibold"
+                                  style={{ color: isDark ? '#E5E7EB' : '#374151' }}
+                                >
+                                  {phase.name}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="w-12 flex-shrink-0 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 pr-2 tabular-nums">
+                            {phase.progress || 0}%
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {tasks.length > 0 && (
+                      <div className="flex items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40">
+                        <div className="w-56 flex-shrink-0 px-3 py-1.5 border-r border-gray-100 dark:border-gray-700">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            Tareas
+                          </span>
+                        </div>
+                        <div className="flex-1" />
+                        <div className="w-12 flex-shrink-0" />
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {tasks.map((task, i) => {

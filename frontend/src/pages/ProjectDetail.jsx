@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { projectsAPI, usersAPI, unitsAPI } from '../services/api';
-import { Kanban, CalendarDays, GanttChartSquare, List, ArrowLeft, Edit, Users, Plus, Trash2, Building2, DollarSign, UserCog } from 'lucide-react';
+import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArrowLeft, Edit, Users, Plus, Trash2, Building2, DollarSign, UserCog } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
+import BudgetPanel from '../components/projects/BudgetPanel';
+import PhasesPanel from '../components/projects/PhasesPanel';
 import { useAuth } from '../context/AuthContext';
 
 const statusConfig = {
@@ -102,6 +104,7 @@ export default function ProjectDetail() {
     { to: `/projects/${id}/kanban`,    icon: Kanban,           label: 'Tablero Kanban' },
     { to: `/projects/${id}/calendar`,  icon: CalendarDays,     label: 'Calendario' },
     { to: `/projects/${id}/gantt`,     icon: GanttChartSquare, label: 'Cronograma' },
+    { to: `/projects/${id}/archive`,   icon: Archive,          label: 'Archivo' },
   ];
 
   return (
@@ -200,7 +203,7 @@ export default function ProjectDetail() {
       {/* Views */}
       <div>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Vistas</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {views.map(({ to, icon: Icon, label }) => (
             <Link key={to} to={to}
               className="card p-4 flex items-center gap-3 hover:shadow-md dark:hover:shadow-gray-900/50 hover:border-primary-200 dark:hover:border-primary-700 transition-all group">
@@ -214,6 +217,17 @@ export default function ProjectDetail() {
           ))}
         </div>
       </div>
+
+      {/* Cronograma macro — fases del proyecto */}
+      <PhasesPanel
+        projectId={id}
+        canEdit={canEdit}
+        projectStart={project.start_date}
+        projectEnd={project.end_date}
+      />
+
+      {/* Presupuesto por partidas */}
+      <BudgetPanel projectId={id} canEdit={canEdit} />
 
       {/* Members */}
       <div className="card p-5">

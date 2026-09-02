@@ -1,5 +1,5 @@
 import { NavLink, useParams } from 'react-router-dom';
-import { List, Kanban, CalendarDays, GanttChartSquare, ArrowLeft } from 'lucide-react';
+import { List, Kanban, CalendarDays, GanttChartSquare, Archive, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const views = [
@@ -7,6 +7,7 @@ const views = [
   { key: 'kanban',    icon: Kanban,           label: 'Tablero',     path: 'kanban' },
   { key: 'calendar',  icon: CalendarDays,     label: 'Calendario',  path: 'calendar' },
   { key: 'gantt',     icon: GanttChartSquare, label: 'Cronograma',  path: 'gantt' },
+  { key: 'archive',   icon: Archive,          label: 'Archivo',     path: 'archive' },
 ];
 
 export default function ViewNavBar({ projectName, projectColor }) {

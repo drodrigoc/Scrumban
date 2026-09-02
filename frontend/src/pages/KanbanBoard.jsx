@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import {
@@ -13,7 +13,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { tasksAPI, projectsAPI, usersAPI } from '../services/api';
-import { Plus, Filter, Pencil, Trash2, Check, X, GripVertical, Lock } from 'lucide-react';
+import { Plus, Filter, Pencil, Trash2, Check, X, GripVertical, Lock, Archive } from 'lucide-react';
 import TaskCard from '../components/tasks/TaskCard';
 import TaskModal from '../components/tasks/TaskModal';
 import Modal from '../components/common/Modal';
@@ -39,13 +39,32 @@ const COLOR_OPTIONS = [
   { color: 'bg-indigo-500', ring: 'ring-indigo-400', label: 'Índigo' },
 ];
 
-const STORAGE_KEY = (projectId) => `kanban_columns_${projectId}`;
+// Configuración de columnas heredada del navegador (pre-migración a BD)
+const LEGACY_STORAGE_KEY = (projectId) => `kanban_columns_${projectId}`;
 const COMPLETED_ID = 'completed';
+
+// Cuánto historial de "Completado" se muestra en el tablero.
+// Es una preferencia de vista personal, por eso vive en localStorage.
+const WINDOW_STORAGE_KEY = (projectId) => `kanban_completed_window_${projectId}`;
+const WINDOW_OPTIONS = [
+  { value: 7,  label: 'Últimos 7 días'  },
+  { value: 30, label: 'Últimos 30 días' },
+  { value: 90, label: 'Últimos 90 días' },
+  { value: 0,  label: 'Todas'           },
+];
+const DEFAULT_WINDOW = 30;
+
+// La BD guarda column_key; el tablero trabaja con id
+const fromApiColumns = (cols) =>
+  cols.map(c => ({ id: c.column_key, label: c.label, color: c.color, ring: c.ring }));
+
+const toApiColumns = (cols) =>
+  cols.map((c, i) => ({ column_key: c.id, label: c.label, color: c.color, ring: c.ring, position: i }));
 
 // ---------------------------------------------------------------------------
 // DroppableColumn
 // ---------------------------------------------------------------------------
-function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRename, onDelete }) {
+function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRename, onDelete, onArchiveTask, footer }) {
   const isLocked = column.id === COMPLETED_ID;
 
   // Sortable handle for column reordering
@@ -191,7 +210,12 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
           }`}
         >
           {tasks.map(task => (
-            <SortableTaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
+            <SortableTaskCard
+              key={task.id}
+              task={task}
+              onClick={() => onTaskClick(task)}
+              onArchive={onArchiveTask}
+            />
           ))}
           {tasks.length === 0 && (
             <p className="text-xs text-center text-gray-400 dark:text-gray-600 py-4 select-none">
@@ -200,6 +224,8 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
           )}
         </div>
       </SortableContext>
+
+      {footer}
     </div>
   );
 }
@@ -290,7 +316,7 @@ function AddColumnPanel({ onAdd }) {
 // ---------------------------------------------------------------------------
 // SortableTaskCard
 // ---------------------------------------------------------------------------
-function SortableTaskCard({ task, onClick }) {
+function SortableTaskCard({ task, onClick, onArchive }) {
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
@@ -305,7 +331,69 @@ function SortableTaskCard({ task, onClick }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} onClick={onClick} />
+      <TaskCard
+        task={task}
+        onClick={onClick}
+        onArchive={onArchive ? () => onArchive(task) : null}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CompletedFooter — evita que la columna "Completado" se sature
+// ---------------------------------------------------------------------------
+function CompletedFooter({
+  projectId, completedWindow, onWindowChange,
+  hiddenCount, completedTotal, archivedCount, archiving, onArchiveOld,
+}) {
+  const archivableCount = completedWindow > 0 ? hiddenCount : completedTotal;
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <select
+        value={completedWindow}
+        onChange={e => onWindowChange(parseInt(e.target.value, 10))}
+        title="Cuánto historial mostrar en esta columna"
+        className="input py-1 text-xs w-full"
+      >
+        {WINDOW_OPTIONS.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+
+      {hiddenCount > 0 && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 px-0.5">
+          {hiddenCount} completada{hiddenCount === 1 ? '' : 's'} anterior{hiddenCount === 1 ? '' : 'es'} sin mostrar
+        </p>
+      )}
+
+      {onArchiveOld && archivableCount > 0 && (
+        <button
+          onClick={onArchiveOld}
+          disabled={archiving}
+          className="w-full flex items-center justify-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-lg
+                     border border-dashed border-gray-300 dark:border-gray-600
+                     text-gray-500 dark:text-gray-400
+                     hover:border-primary-400 hover:text-primary-600 dark:hover:text-primary-400
+                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {archiving
+            ? <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            : <Archive className="w-3.5 h-3.5" />
+          }
+          Archivar {archivableCount}
+        </button>
+      )}
+
+      {archivedCount > 0 && (
+        <Link
+          to={`/projects/${projectId}/archive`}
+          className="block text-center text-xs text-primary-600 dark:text-primary-400 hover:underline py-0.5"
+        >
+          Ver archivo ({archivedCount})
+        </Link>
+      )}
     </div>
   );
 }
@@ -329,6 +417,12 @@ export default function KanbanBoard() {
   const [newTaskStatus, setNewTaskStatus] = useState('pending');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [archiving, setArchiving] = useState(false);
+  const [completedWindow, setCompletedWindow] = useState(() => {
+    const saved = parseInt(localStorage.getItem(WINDOW_STORAGE_KEY(projectId)), 10);
+    return WINDOW_OPTIONS.some(o => o.value === saved) ? saved : DEFAULT_WINDOW;
+  });
 
   const tasksRef = useRef(tasks);
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
@@ -342,20 +436,45 @@ export default function KanbanBoard() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  // Load columns from localStorage
+  // Columnas: ahora vienen de la BD y son las mismas para todo el equipo.
+  // Si este navegador todavía tiene la configuración vieja en localStorage
+  // y el servidor no tiene ninguna, se migra una sola vez y se borra.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY(projectId));
-      if (saved) setColumns(JSON.parse(saved));
-    } catch { /* ignore corrupt data */ }
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data } = await projectsAPI.getColumns(projectId);
+        if (cancelled) return;
+
+        const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY(projectId));
+        if (data.is_default && legacyRaw) {
+          try {
+            const legacy = JSON.parse(legacyRaw);
+            if (Array.isArray(legacy) && legacy.length) {
+              const { data: saved } = await projectsAPI.saveColumns(projectId, toApiColumns(legacy));
+              localStorage.removeItem(LEGACY_STORAGE_KEY(projectId));
+              if (!cancelled) setColumns(fromApiColumns(saved.columns));
+              return;
+            }
+          } catch { /* configuración local corrupta: se ignora */ }
+        }
+
+        // El servidor manda: la copia local ya no se usa
+        if (legacyRaw) localStorage.removeItem(LEGACY_STORAGE_KEY(projectId));
+        setColumns(fromApiColumns(data.columns));
+      } catch {
+        /* sin conexión con el servidor: se mantienen las columnas por defecto */
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [projectId]);
 
-  // Persist columns to localStorage whenever they change (after initial load)
+  // Preferencia personal de cuánto historial mostrar en "Completado"
   useEffect(() => {
-    if (!loading) {
-      localStorage.setItem(STORAGE_KEY(projectId), JSON.stringify(columns));
-    }
-  }, [columns, projectId, loading]);
+    localStorage.setItem(WINDOW_STORAGE_KEY(projectId), String(completedWindow));
+  }, [completedWindow, projectId]);
 
   useEffect(() => {
     Promise.all([
@@ -370,6 +489,19 @@ export default function KanbanBoard() {
       setLabels(l.data);
     }).catch(() => toast.error('Error al cargar tablero'))
       .finally(() => setLoading(false));
+
+    tasksAPI.getArchivedCount(projectId)
+      .then(({ data }) => setArchivedCount(data.count))
+      .catch(() => { /* el contador es informativo, no bloquea el tablero */ });
+  }, [projectId]);
+
+  // Guarda la configuración de columnas para todo el equipo
+  const persistColumns = useCallback(async (next) => {
+    try {
+      await projectsAPI.saveColumns(projectId, toApiColumns(next));
+    } catch {
+      toast.error('No se pudieron guardar las columnas');
+    }
   }, [projectId]);
 
   const canEdit = useMemo(() => {
@@ -378,21 +510,94 @@ export default function KanbanBoard() {
     return !me || me.project_role !== 'viewer';
   }, [user, members]);
 
+  const windowCutoff = useMemo(
+    () => (completedWindow > 0 ? new Date(Date.now() - completedWindow * 24 * 60 * 60 * 1000) : null),
+    [completedWindow]
+  );
+
+  const matchesFilters = useCallback((t) => {
+    if (filterAssignee && t.assignee_id !== parseInt(filterAssignee)) return false;
+    if (filterPriority && t.priority !== filterPriority) return false;
+    return true;
+  }, [filterAssignee, filterPriority]);
+
+  // Una tarjeta completada deja de mostrarse cuando su cierre cae fuera de
+  // la ventana elegida. No se borra ni se archiva sola: solo se oculta.
+  const isRecentlyCompleted = useCallback((t) => {
+    if (!windowCutoff) return true;
+    const closed = t.completed_at || t.updated_at;
+    if (!closed) return true;
+    return new Date(closed) >= windowCutoff;
+  }, [windowCutoff]);
+
   const getColumnTasks = (status) =>
     tasks
       .filter(t => {
         if (t.status !== status) return false;
-        if (filterAssignee && t.assignee_id !== parseInt(filterAssignee)) return false;
-        if (filterPriority && t.priority !== filterPriority) return false;
+        if (!matchesFilters(t)) return false;
+        if (status === COMPLETED_ID && !isRecentlyCompleted(t)) return false;
         return true;
       })
       .sort((a, b) => a.position - b.position);
 
+  // Completadas fuera de la ventana → candidatas a archivar en bloque
+  const hiddenCompleted = useMemo(
+    () => tasks.filter(t =>
+      t.status === COMPLETED_ID && matchesFilters(t) && !isRecentlyCompleted(t)
+    ).length,
+    [tasks, matchesFilters, isRecentlyCompleted]
+  );
+  const completedTotal = useMemo(
+    () => tasks.filter(t => t.status === COMPLETED_ID).length,
+    [tasks]
+  );
+
+  // --- Archivado ---
+
+  const handleArchiveTask = useCallback(async (task) => {
+    try {
+      await tasksAPI.archive(projectId, task.id);
+      setTasks(prev => prev.filter(t => t.id !== task.id));
+      setArchivedCount(c => c + 1);
+      toast.success('Tarea archivada');
+    } catch {
+      toast.error('Error al archivar la tarea');
+    }
+  }, [projectId]);
+
+  const handleArchiveOld = async () => {
+    const days = completedWindow;
+    const pregunta = days > 0
+      ? `¿Archivar las tareas completadas hace más de ${days} días?`
+      : '¿Archivar todas las tareas completadas?';
+    if (!confirm(`${pregunta}\n\nNo se elimina nada: podrás verlas y restaurarlas desde la vista de Archivo.`)) return;
+
+    setArchiving(true);
+    try {
+      const { data } = await tasksAPI.archiveCompleted(projectId, days);
+      if (data.archived > 0) {
+        const { data: fresh } = await tasksAPI.getByProject(projectId);
+        setTasks(fresh);
+        setArchivedCount(c => c + data.archived);
+        toast.success(`${data.archived} tarea(s) archivada(s)`);
+      } else {
+        toast.info('No hay tareas para archivar');
+      }
+    } catch {
+      toast.error('Error al archivar las tareas');
+    } finally {
+      setArchiving(false);
+    }
+  };
+
   // --- Column management ---
+  // Cada cambio se guarda en la BD: el tablero es el mismo para todo el equipo.
 
   const handleRenameColumn = useCallback((colId, newLabel) => {
-    setColumns(prev => prev.map(c => c.id === colId ? { ...c, label: newLabel } : c));
-  }, []);
+    const next = columnsRef.current.map(c => c.id === colId ? { ...c, label: newLabel } : c);
+    setColumns(next);
+    persistColumns(next);
+  }, [persistColumns]);
 
   const handleDeleteColumn = useCallback((colId) => {
     if (colId === COMPLETED_ID) return;
@@ -404,21 +609,24 @@ export default function KanbanBoard() {
       return;
     }
     if (!confirm('¿Eliminar esta columna?')) return;
-    setColumns(prev => prev.filter(c => c.id !== colId));
-  }, []);
+    const next = columnsRef.current.filter(c => c.id !== colId);
+    setColumns(next);
+    persistColumns(next);
+  }, [persistColumns]);
 
   const handleAddColumn = useCallback(({ label, color, ring }) => {
     const id = `col_${Date.now()}`;
+    const newCol = { id, label, color, ring };
     // Insert before the 'completed' column so it stays last
-    setColumns(prev => {
-      const completedIdx = prev.findIndex(c => c.id === COMPLETED_ID);
-      const newCol = { id, label, color, ring };
-      if (completedIdx === -1) return [...prev, newCol];
-      const next = [...prev];
-      next.splice(completedIdx, 0, newCol);
-      return next;
-    });
-  }, []);
+    const prev = columnsRef.current;
+    const completedIdx = prev.findIndex(c => c.id === COMPLETED_ID);
+    const next = [...prev];
+    if (completedIdx === -1) next.push(newCol);
+    else next.splice(completedIdx, 0, newCol);
+
+    setColumns(next);
+    persistColumns(next);
+  }, [persistColumns]);
 
   // --- Drag handlers ---
 
@@ -466,12 +674,14 @@ export default function KanbanBoard() {
         ?? (String(over.id).startsWith('col_') ? String(over.id).replace('col_', '') : null);
       if (!overColId || activeColId === overColId) return;
 
-      setColumns(prev => {
-        const oldIdx = prev.findIndex(c => c.id === activeColId);
-        const newIdx = prev.findIndex(c => c.id === overColId);
-        if (oldIdx === -1 || newIdx === -1) return prev;
-        return arrayMove(prev, oldIdx, newIdx);
-      });
+      const prev = columnsRef.current;
+      const oldIdx = prev.findIndex(c => c.id === activeColId);
+      const newIdx = prev.findIndex(c => c.id === overColId);
+      if (oldIdx === -1 || newIdx === -1) return;
+
+      const next = arrayMove(prev, oldIdx, newIdx);
+      setColumns(next);
+      persistColumns(next);
       return;
     }
 
@@ -491,18 +701,25 @@ export default function KanbanBoard() {
 
     try {
       await tasksAPI.update(projectId, active.id, updatePayload);
-      if (movingToCompleted) {
-        setTasks(prev =>
-          prev.map(t => t.id === active.id ? { ...t, progress: 100 } : t)
-        );
-      }
+      // Reflejar la fecha de cierre que acaba de sellar el servidor, para que
+      // la tarjeta no desaparezca de la columna por la ventana de tiempo.
+      setTasks(prev =>
+        prev.map(t => t.id === active.id
+          ? {
+              ...t,
+              ...(movingToCompleted
+                ? { progress: 100, completed_at: new Date().toISOString() }
+                : { completed_at: null }),
+            }
+          : t)
+      );
     } catch {
       setTasks(prev =>
         prev.map(t => t.id === active.id ? { ...t, status: originalStatus } : t)
       );
       toast.error('Error al mover tarea');
     }
-  }, [projectId]);
+  }, [projectId, persistColumns]);
 
   const handleDragCancel = useCallback(() => {
     const originalStatus = dragOriginRef.current;
@@ -625,6 +842,19 @@ export default function KanbanBoard() {
                   onTaskClick={handleTaskClick}
                   onRename={handleRenameColumn}
                   onDelete={handleDeleteColumn}
+                  onArchiveTask={canEdit && col.id === COMPLETED_ID ? handleArchiveTask : null}
+                  footer={col.id === COMPLETED_ID ? (
+                    <CompletedFooter
+                      projectId={projectId}
+                      completedWindow={completedWindow}
+                      onWindowChange={setCompletedWindow}
+                      hiddenCount={hiddenCompleted}
+                      completedTotal={completedTotal}
+                      archivedCount={archivedCount}
+                      archiving={archiving}
+                      onArchiveOld={canEdit ? handleArchiveOld : null}
+                    />
+                  ) : null}
                 />
               ))}
               <AddColumnPanel onAdd={handleAddColumn} />

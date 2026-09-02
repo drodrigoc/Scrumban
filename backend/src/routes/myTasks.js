@@ -8,7 +8,8 @@ router.get('/', async (req, res) => {
   try {
     const { status, priority, project_id } = req.query;
 
-    let where = 'WHERE t.assignee_id = ?';
+    // Las tareas archivadas no aparecen en "Mis tareas"
+    let where = 'WHERE t.assignee_id = ? AND t.archived_at IS NULL';
     const params = [req.user.id];
 
     if (status)     { where += ' AND t.status = ?';     params.push(status); }

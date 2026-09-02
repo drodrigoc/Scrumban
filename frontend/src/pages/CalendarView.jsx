@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { tasksAPI, projectsAPI } from '../services/api';
+import { fetchKanbanColumns } from '../services/columns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import TaskModal from '../components/tasks/TaskModal';
 import Modal from '../components/common/Modal';
@@ -112,11 +113,10 @@ export default function CalendarView() {
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
-    // Cargar columnas del proyecto desde localStorage
-    const saved = localStorage.getItem(`kanban_columns_${projectId}`);
-    if (saved) {
-      try { setColumns(JSON.parse(saved)); } catch { /* usa DEFAULT_COLUMNS */ }
-    }
+    // Columnas del proyecto (compartidas por el equipo, desde la BD)
+    fetchKanbanColumns(projectId)
+      .then(setColumns)
+      .catch(() => { /* usa DEFAULT_COLUMNS */ });
 
     Promise.all([
       tasksAPI.getByProject(projectId),

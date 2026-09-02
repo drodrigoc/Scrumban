@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { tasksAPI, projectsAPI } from '../services/api';
+import { fetchKanbanColumns, DEFAULT_KANBAN_COLUMNS } from '../services/columns';
 import {
   Plus, Search, Filter, ChevronUp, ChevronDown,
   ChevronsUpDown, Trash2, Edit, CheckSquare, Square,
@@ -145,18 +146,13 @@ export default function BacklogView() {
   const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Columnas del tablero Kanban (del localStorage del proyecto)
-  const kanbanColumns = useMemo(() => {
-    try {
-      const saved = localStorage.getItem(`kanban_columns_${projectId}`);
-      if (saved) return JSON.parse(saved);
-    } catch { /* ignore */ }
-    return [
-      { id: 'pending',     label: 'Pendiente' },
-      { id: 'in_progress', label: 'En Proceso' },
-      { id: 'in_review',   label: 'En Revisión' },
-      { id: 'completed',   label: 'Completado' },
-    ];
+  // Columnas del tablero Kanban (compartidas por proyecto, desde la BD)
+  const [kanbanColumns, setKanbanColumns] = useState(DEFAULT_KANBAN_COLUMNS);
+
+  useEffect(() => {
+    fetchKanbanColumns(projectId)
+      .then(setKanbanColumns)
+      .catch(() => { /* se mantienen las columnas por defecto */ });
   }, [projectId]);
 
   const [search, setSearch] = useState('');

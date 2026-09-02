@@ -1,4 +1,4 @@
-import { Calendar, AlertTriangle, MessageCircle } from 'lucide-react';
+import { Calendar, AlertTriangle, MessageCircle, Archive } from 'lucide-react';
 import { format, isPast, parseISO, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -9,7 +9,7 @@ const priorityLabel = {
   low: 'Baja', medium: 'Media', high: 'Alta', critical: 'Crítica',
 };
 
-export default function TaskCard({ task, onClick }) {
+export default function TaskCard({ task, onClick, onArchive }) {
   const isOverdue = task.due_date && task.status !== 'completed' && isPast(parseISO(task.due_date));
   const daysLeft = task.due_date ? differenceInDays(parseISO(task.due_date), new Date()) : null;
   const isDueSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && task.status !== 'completed';
@@ -18,6 +18,7 @@ export default function TaskCard({ task, onClick }) {
     <div
       onClick={onClick}
       className={`
+        group/card relative
         rounded-xl p-3 cursor-pointer select-none transition-all
         hover:shadow-md hover:-translate-y-0.5
         border
@@ -27,6 +28,21 @@ export default function TaskCard({ task, onClick }) {
         }
       `}
     >
+      {/* Archivar — solo en tarjetas completadas del tablero */}
+      {onArchive && (
+        <button
+          type="button"
+          title="Archivar tarea"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onArchive(); }}
+          className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover/card:opacity-100
+                     text-gray-400 hover:text-primary-600 dark:hover:text-primary-400
+                     hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+        >
+          <Archive className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       {/* Labels */}
       {task.labels && task.labels.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">

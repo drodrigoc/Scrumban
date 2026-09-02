@@ -135,6 +135,9 @@ CREATE TABLE tasks (
   position    INT          DEFAULT 0,
   progress    INT          DEFAULT 0,
   costo       DECIMAL(12,2) DEFAULT NULL,
+  phase_id    INT          DEFAULT NULL,
+  completed_at DATETIME    DEFAULT NULL,
+  archived_at  DATETIME    DEFAULT NULL,
   created_by  INT          DEFAULT NULL,
   created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
@@ -267,19 +270,81 @@ CREATE TABLE task_sgc (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------
--- 15. Índices de rendimiento
+-- 15. Columnas del tablero Kanban
+--     Compartidas por proyecto (antes vivían en localStorage)
+-- ------------------------------------------------------------
+CREATE TABLE project_kanban_columns (
+  id         INT PRIMARY KEY AUTO_INCREMENT,
+  project_id INT          NOT NULL,
+  column_key VARCHAR(100) NOT NULL,
+  label      VARCHAR(100) NOT NULL,
+  color      VARCHAR(50)  DEFAULT 'bg-gray-400',
+  ring       VARCHAR(50)  DEFAULT 'ring-gray-400',
+  position   INT          DEFAULT 0,
+  created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_project_column (project_id, column_key),
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 16. Partidas de presupuesto — costos fijos y variables
+-- ------------------------------------------------------------
+CREATE TABLE project_budget_items (
+  id              INT PRIMARY KEY AUTO_INCREMENT,
+  project_id      INT NOT NULL,
+  tipo            ENUM('fijo','variable') NOT NULL DEFAULT 'fijo',
+  categoria       VARCHAR(120)  NOT NULL,
+  descripcion     VARCHAR(255)  DEFAULT NULL,
+  monto_estimado  DECIMAL(14,2) NOT NULL DEFAULT 0,
+  monto_ejecutado DECIMAL(14,2) NOT NULL DEFAULT 0,
+  fecha           DATE          DEFAULT NULL,
+  created_by      INT           DEFAULT NULL,
+  created_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id)    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 17. Fases del proyecto — cronograma macro
+--     progress NULL = se calcula desde las tareas de la fase
+-- ------------------------------------------------------------
+CREATE TABLE project_phases (
+  id          INT PRIMARY KEY AUTO_INCREMENT,
+  project_id  INT          NOT NULL,
+  name        VARCHAR(255) NOT NULL,
+  description VARCHAR(500) DEFAULT NULL,
+  start_date  DATE         DEFAULT NULL,
+  end_date    DATE         DEFAULT NULL,
+  position    INT          DEFAULT 0,
+  color       VARCHAR(7)   DEFAULT '#6366F1',
+  progress    INT          DEFAULT NULL,
+  created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE tasks
+  ADD CONSTRAINT fk_tasks_phase FOREIGN KEY (phase_id) REFERENCES project_phases(id) ON DELETE SET NULL;
+
+-- ------------------------------------------------------------
+-- 18. Índices de rendimiento
 -- ------------------------------------------------------------
 CREATE INDEX idx_tasks_project        ON tasks(project_id);
 CREATE INDEX idx_tasks_assignee       ON tasks(assignee_id);
 CREATE INDEX idx_tasks_status         ON tasks(status);
 CREATE INDEX idx_tasks_due_date       ON tasks(due_date);
+CREATE INDEX idx_tasks_archived       ON tasks(project_id, archived_at);
+CREATE INDEX idx_tasks_completed_at   ON tasks(completed_at);
 CREATE INDEX idx_notifications_user   ON notifications(user_id, is_read);
 CREATE INDEX idx_project_members_user ON project_members(user_id);
 CREATE INDEX idx_checklist_task       ON task_checklist_items(task_id);
 CREATE INDEX idx_units_name           ON units(name);
+CREATE INDEX idx_budget_project       ON project_budget_items(project_id, tipo);
+CREATE INDEX idx_phases_project       ON project_phases(project_id, position);
 
 -- ------------------------------------------------------------
--- 16. Usuario administrador inicial
+-- 19. Usuario administrador inicial
 --     Contraseña: Admin1234
 -- ------------------------------------------------------------
 INSERT INTO users (name, email, password, role, is_active)

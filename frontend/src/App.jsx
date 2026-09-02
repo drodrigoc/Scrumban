@@ -15,6 +15,7 @@ import KanbanBoard from './pages/KanbanBoard';
 import CalendarView from './pages/CalendarView';
 import GanttView from './pages/GanttView';
 import BacklogView from './pages/BacklogView';
+import ArchiveView from './pages/ArchiveView';
 import TeamView from './pages/TeamView';
 import UnitsAdmin from './pages/UnitsAdmin';
 import Users from './pages/Users';
@@ -54,6 +55,7 @@ function AppRoutes() {
         <Route path="projects/:id/kanban" element={<KanbanBoard />} />
         <Route path="projects/:id/calendar" element={<CalendarView />} />
         <Route path="projects/:id/gantt" element={<GanttView />} />
+        <Route path="projects/:id/archive" element={<ArchiveView />} />
         <Route path="team" element={
           <PrivateRoute roles={['admin', 'coordinator', 'superViewer']}>
             <TeamView />

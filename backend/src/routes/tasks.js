@@ -6,14 +6,20 @@ const { uploadTask, uploadSGC } = require('../middleware/upload');
 router.use(authenticate);
 
 // Solo lectura — permitido a todos
-router.get('/',    ctrl.getByProject);
-router.get('/:id', ctrl.getById);
+// Las rutas literales van antes que '/:id' para que Express no las
+// interprete como un id de tarea.
+router.get('/',                ctrl.getByProject);
+router.get('/archived-count',  ctrl.archivedCount);
+router.get('/:id',             ctrl.getById);
 
 // Escritura — bloqueado para viewers del proyecto
-router.post('/',              denyProjectViewer, ctrl.create);
-router.patch('/positions',    denyProjectViewer, ctrl.updatePositions);
-router.put('/:id',            denyProjectViewer, ctrl.update);
-router.delete('/:id',         denyProjectViewer, ctrl.delete);
+router.post('/',                    denyProjectViewer, ctrl.create);
+router.patch('/positions',          denyProjectViewer, ctrl.updatePositions);
+router.post('/archive-completed',   denyProjectViewer, ctrl.archiveCompleted);
+router.patch('/:id/archive',        denyProjectViewer, ctrl.archive);
+router.patch('/:id/unarchive',      denyProjectViewer, ctrl.unarchive);
+router.put('/:id',                  denyProjectViewer, ctrl.update);
+router.delete('/:id',               denyProjectViewer, ctrl.delete);
 
 router.post('/:id/comments',                denyProjectViewer, ctrl.addComment);
 router.delete('/:id/comments/:commentId',   denyProjectViewer, ctrl.deleteComment);

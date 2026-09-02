@@ -7,7 +7,8 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "db:migrate": "mysql -u root -p project_manager < ../database/schema.sql",
-    "db:seed": "mysql -u root -p project_manager < ../database/seed.sql"
+    "db:seed": "mysql -u root -p project_manager < ../database/seed.sql",
+    "db:migrate:v2": "node scripts/migrate.js ../database/migration_v2.sql"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

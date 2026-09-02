@@ -276,6 +276,88 @@ exports.createLabel = async (req, res) => {
   }
 };
 
+// ── Columnas del tablero Kanban ──────────────────────────────────────────
+// Antes vivían en el localStorage de cada navegador, así que cada usuario
+// veía un tablero distinto. Ahora se guardan por proyecto en la BD.
+
+const DEFAULT_COLUMNS = [
+  { column_key: 'pending',     label: 'Pendiente',   color: 'bg-gray-400',  ring: 'ring-gray-400'  },
+  { column_key: 'in_progress', label: 'En Proceso',  color: 'bg-blue-500',  ring: 'ring-blue-400'  },
+  { column_key: 'in_review',   label: 'En Revisión', color: 'bg-amber-500', ring: 'ring-amber-400' },
+  { column_key: 'completed',   label: 'Completado',  color: 'bg-green-500', ring: 'ring-green-400' },
+];
+
+exports.getColumns = async (req, res) => {
+  try {
+    const [columns] = await db.query(
+      `SELECT column_key, label, color, ring, position
+         FROM project_kanban_columns
+        WHERE project_id = ?
+        ORDER BY position ASC, id ASC`,
+      [req.params.id]
+    );
+
+    // Sin configuración guardada → columnas por defecto (aún no persistidas)
+    if (!columns.length) {
+      return res.json({
+        columns: DEFAULT_COLUMNS.map((c, i) => ({ ...c, position: i })),
+        is_default: true,
+      });
+    }
+
+    res.json({ columns, is_default: false });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al obtener las columnas del tablero' });
+  }
+};
+
+// PUT /api/projects/:id/columns — reemplaza la configuración completa
+exports.saveColumns = async (req, res) => {
+  const { columns } = req.body;
+
+  if (!Array.isArray(columns) || !columns.length) {
+    return res.status(400).json({ message: 'Se requiere al menos una columna' });
+  }
+  if (!columns.some(c => c.column_key === 'completed')) {
+    return res.status(400).json({ message: 'La columna "completed" no se puede eliminar' });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM project_kanban_columns WHERE project_id = ?', [req.params.id]);
+
+    const values = columns.map((c, i) => [
+      req.params.id,
+      String(c.column_key).slice(0, 100),
+      String(c.label || c.column_key).slice(0, 100),
+      c.color || 'bg-gray-400',
+      c.ring  || 'ring-gray-400',
+      c.position ?? i,
+    ]);
+
+    await conn.query(
+      'INSERT INTO project_kanban_columns (project_id, column_key, label, color, ring, position) VALUES ?',
+      [values]
+    );
+    await conn.commit();
+
+    const [saved] = await conn.query(
+      `SELECT column_key, label, color, ring, position
+         FROM project_kanban_columns WHERE project_id = ? ORDER BY position ASC, id ASC`,
+      [req.params.id]
+    );
+    res.json({ columns: saved, is_default: false });
+  } catch (error) {
+    await conn.rollback();
+    logger.error(error);
+    res.status(500).json({ message: 'Error al guardar las columnas del tablero' });
+  } finally {
+    conn.release();
+  }
+};
+
 async function createNotification(userId, title, message, type, refId, refType) {
   try {
     await db.query(

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { tasksAPI, projectsAPI, sgcAPI, getUploadUrl } from '../../services/api';
+import { tasksAPI, projectsAPI, sgcAPI, phasesAPI, getUploadUrl } from '../../services/api';
 import {
   Trash2, Send, Paperclip, Clock, Tag, User, Calendar,
-  AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck,
+  AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck, Layers,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,6 +25,7 @@ const DEFAULT_STATUS_OPTIONS = [
 const historyFieldLabels = {
   status: 'estado', priority: 'prioridad', assignee: 'responsable',
   title: 'título', created: 'creó la tarea',
+  phase: 'la fase', archived: 'el archivado',
 };
 
 // Colores predefinidos para nuevas etiquetas
@@ -118,7 +119,11 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
     label_ids:   task?.labels?.map(l => l.id) || [],
     sgc_ids:     task?.sgc_evidencias?.map(e => e.id) || [],
     costo:       task?.costo != null ? String(task.costo) : '',
+    phase_id:    task?.phase_id != null ? String(task.phase_id) : '',
   });
+
+  // Fases del cronograma macro del proyecto
+  const [phases, setPhases] = useState([]);
 
   // SGC state
   const [sgcEvidencias, setSgcEvidencias] = useState([]);
@@ -156,6 +161,13 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       .catch(() => {}); // silently fail — SGC is optional
   }, []);
 
+  // Load fases del proyecto (el cronograma macro también es opcional)
+  useEffect(() => {
+    phasesAPI.getAll(projectId)
+      .then(({ data }) => setPhases(data))
+      .catch(() => {});
+  }, [projectId]);
+
   // Load checklist lazily when tab is first opened
   useEffect(() => {
     if (activeTab === 'checklist' && task?.id && checklist === null) {
@@ -181,6 +193,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
         start_date:  form.start_date  || null,
         due_date:    form.due_date    || null,
         costo:       form.costo !== '' ? parseFloat(form.costo) : null,
+        phase_id:    form.phase_id !== '' ? parseInt(form.phase_id, 10) : null,
       });
     } finally {
       setSaving(false);
@@ -394,6 +407,22 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               />
             </div>
           </div>
+
+          {phases.length > 0 && (
+            <div>
+              <label className="label flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5" /> Fase del cronograma
+              </label>
+              <select
+                className="input"
+                value={form.phase_id}
+                onChange={e => setForm({ ...form, phase_id: e.target.value })}
+              >
+                <option value="">Sin fase asignada</option>
+                {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="label flex items-center gap-1">

@@ -78,6 +78,25 @@ export const projectsAPI = {
   removeMember: (id, userId) => api.delete(`/projects/${id}/members/${userId}`),
   getLabels: (id) => api.get(`/projects/${id}/labels`),
   createLabel: (id, data) => api.post(`/projects/${id}/labels`, data),
+  // Columnas del tablero Kanban (compartidas por todo el equipo)
+  getColumns: (id) => api.get(`/projects/${id}/columns`),
+  saveColumns: (id, columns) => api.put(`/projects/${id}/columns`, { columns }),
+};
+
+// Presupuesto — partidas de costos fijos y variables
+export const budgetAPI = {
+  getAll: (projectId) => api.get(`/projects/${projectId}/budget`),
+  create: (projectId, data) => api.post(`/projects/${projectId}/budget`, data),
+  update: (projectId, itemId, data) => api.put(`/projects/${projectId}/budget/${itemId}`, data),
+  delete: (projectId, itemId) => api.delete(`/projects/${projectId}/budget/${itemId}`),
+};
+
+// Fases — cronograma macro del proyecto
+export const phasesAPI = {
+  getAll: (projectId) => api.get(`/projects/${projectId}/phases`),
+  create: (projectId, data) => api.post(`/projects/${projectId}/phases`, data),
+  update: (projectId, phaseId, data) => api.put(`/projects/${projectId}/phases/${phaseId}`, data),
+  delete: (projectId, phaseId) => api.delete(`/projects/${projectId}/phases/${phaseId}`),
 };
 
 // Tasks
@@ -88,6 +107,14 @@ export const tasksAPI = {
   update: (projectId, id, data) => api.put(`/projects/${projectId}/tasks/${id}`, data),
   delete: (projectId, id) => api.delete(`/projects/${projectId}/tasks/${id}`),
   updatePositions: (projectId, tasks) => api.patch(`/projects/${projectId}/tasks/positions`, { tasks }),
+  // Archivado
+  archive: (projectId, id) => api.patch(`/projects/${projectId}/tasks/${id}/archive`),
+  unarchive: (projectId, id) => api.patch(`/projects/${projectId}/tasks/${id}/unarchive`),
+  archiveCompleted: (projectId, olderThanDays) =>
+    api.post(`/projects/${projectId}/tasks/archive-completed`, { older_than_days: olderThanDays }),
+  getArchived: (projectId, params) =>
+    api.get(`/projects/${projectId}/tasks`, { params: { ...params, archived: 1 } }),
+  getArchivedCount: (projectId) => api.get(`/projects/${projectId}/tasks/archived-count`),
   addComment: (projectId, id, content) => api.post(`/projects/${projectId}/tasks/${id}/comments`, { content }),
   deleteComment: (projectId, id, commentId) => api.delete(`/projects/${projectId}/tasks/${id}/comments/${commentId}`),
   uploadAttachment: (projectId, id, formData) =>

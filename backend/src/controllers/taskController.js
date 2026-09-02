@@ -22,7 +22,7 @@ async function logHistory(taskId, userId, field, oldVal, newVal) {
 exports.getByProject = async (req, res) => {
   try {
     const { project_id } = req.params;
-    const { status, assignee_id, priority, label_id } = req.query;
+    const { status, assignee_id, priority, label_id, archived, month, phase_id } = req.query;
 
     let where = 'WHERE t.project_id = ?';
     const params = [project_id];
@@ -34,20 +34,38 @@ exports.getByProject = async (req, res) => {
       where += ' AND EXISTS (SELECT 1 FROM task_labels tl WHERE tl.task_id = t.id AND tl.label_id = ?)';
       params.push(label_id);
     }
+    if (phase_id) { where += ' AND t.phase_id = ?'; params.push(phase_id); }
+
+    // Las archivadas quedan fuera de todas las vistas salvo que se pidan
+    const onlyArchived = archived === '1' || archived === 'true';
+    if (onlyArchived)            where += ' AND t.archived_at IS NOT NULL';
+    else if (archived !== 'all') where += ' AND t.archived_at IS NULL';
+
+    // month = 'YYYY-MM' sobre la fecha de cierre (vista de Archivo)
+    if (month) {
+      where += " AND DATE_FORMAT(COALESCE(t.completed_at, t.archived_at), '%Y-%m') = ?";
+      params.push(month);
+    }
+
+    const orderBy = onlyArchived
+      ? 'ORDER BY COALESCE(t.completed_at, t.archived_at) DESC, t.id DESC'
+      : 'ORDER BY t.position, t.created_at';
 
     const [tasks] = await db.query(`
       SELECT t.*,
         u.name as assignee_name, u.avatar as assignee_avatar,
         cb.name as created_by_name,
+        ph.name as phase_name, ph.color as phase_color,
         GROUP_CONCAT(DISTINCT l.id, ':', l.name, ':', l.color SEPARATOR '|') as labels_raw
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assignee_id
       LEFT JOIN users cb ON cb.id = t.created_by
+      LEFT JOIN project_phases ph ON ph.id = t.phase_id
       LEFT JOIN task_labels tl ON tl.task_id = t.id
       LEFT JOIN labels l ON l.id = tl.label_id
       ${where}
       GROUP BY t.id
-      ORDER BY t.position, t.created_at
+      ${orderBy}
     `, params);
 
     const formatted = tasks.map(t => ({
@@ -132,7 +150,7 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { project_id } = req.params;
-    const { title, description, assignee_id, start_date, due_date, priority, status, label_ids, sgc_ids, costo } = req.body;
+    const { title, description, assignee_id, start_date, due_date, priority, status, label_ids, sgc_ids, costo, phase_id } = req.body;
 
     if (!title) return res.status(400).json({ message: 'El título es requerido' });
 
@@ -142,11 +160,15 @@ exports.create = async (req, res) => {
     );
     const position = (maxPos[0].max || 0) + 1;
 
+    // Una tarea creada ya completada guarda su fecha de cierre de una vez
+    const completedAt = (status || 'pending') === 'completed' ? new Date() : null;
+
     const [result] = await db.query(
-      `INSERT INTO tasks (project_id, title, description, assignee_id, start_date, due_date, priority, status, position, created_by, costo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (project_id, title, description, assignee_id, start_date, due_date, priority, status, position, created_by, costo, phase_id, completed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [project_id, title, description, assignee_id || null, start_date || null, due_date || null,
-       priority || 'medium', status || 'pending', position, req.user.id, costo || null]
+       priority || 'medium', status || 'pending', position, req.user.id, costo || null,
+       phase_id || null, completedAt]
     );
 
     const taskId = result.insertId;
@@ -178,7 +200,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, assignee_id, start_date, due_date, priority, status, position, progress, label_ids, sgc_ids, costo } = req.body;
+    const { title, description, assignee_id, start_date, due_date, priority, status, position, progress, label_ids, sgc_ids, costo, phase_id } = req.body;
 
     const [current] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
     if (!current.length) return res.status(404).json({ message: 'Tarea no encontrada' });
@@ -208,6 +230,15 @@ exports.update = async (req, res) => {
     if (status && status !== task.status) {
       fields.push('status = ?'); values.push(status);
       changes.push({ field: 'status', old: task.status, new: status });
+
+      // Fecha de cierre: se sella al completar y se limpia al reabrir.
+      // Es lo que permite agrupar el archivo por mes.
+      if (status === 'completed') {
+        fields.push('completed_at = ?'); values.push(new Date());
+      } else if (task.status === 'completed') {
+        fields.push('completed_at = ?', 'archived_at = ?'); values.push(null, null);
+      }
+
       if (task.assignee_id && task.assignee_id !== req.user.id) {
         await createNotification(task.assignee_id, 'Estado de tarea actualizado', `La tarea "${task.title}" cambió a ${status}`, 'status_changed', id, 'task');
       }
@@ -215,6 +246,12 @@ exports.update = async (req, res) => {
     if (position !== undefined) { fields.push('position = ?'); values.push(position); }
     if (progress !== undefined) { fields.push('progress = ?'); values.push(progress); }
     if (costo !== undefined) { fields.push('costo = ?'); values.push(costo || null); }
+    if (phase_id !== undefined) {
+      fields.push('phase_id = ?'); values.push(phase_id || null);
+      if ((phase_id || null) !== task.phase_id) {
+        changes.push({ field: 'phase', old: task.phase_id, new: phase_id || null });
+      }
+    }
 
     if (fields.length) {
       values.push(id);
@@ -263,6 +300,90 @@ exports.delete = async (req, res) => {
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al eliminar tarea' });
+  }
+};
+
+// ── Archivado ────────────────────────────────────────────────────────────
+// Archivar no borra nada: saca la tarjeta del tablero y la manda a la
+// vista de Archivo, agrupada por mes de cierre.
+
+// PATCH /:id/archive
+exports.archive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [current] = await db.query('SELECT id, status, completed_at FROM tasks WHERE id = ?', [id]);
+    if (!current.length) return res.status(404).json({ message: 'Tarea no encontrada' });
+
+    const task = current[0];
+    const now = new Date();
+    // Si se completó antes de que existiera completed_at, sellamos la fecha ahora
+    const completedAt = task.status === 'completed' ? (task.completed_at || now) : task.completed_at;
+
+    await db.query('UPDATE tasks SET archived_at = ?, completed_at = ? WHERE id = ?', [now, completedAt, id]);
+    await logHistory(id, req.user.id, 'archived', null, 'Tarea archivada');
+
+    const [[updated]] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    res.json(updated);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al archivar la tarea' });
+  }
+};
+
+// PATCH /:id/unarchive
+exports.unarchive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [result] = await db.query('UPDATE tasks SET archived_at = NULL WHERE id = ?', [id]);
+    if (!result.affectedRows) return res.status(404).json({ message: 'Tarea no encontrada' });
+
+    await logHistory(id, req.user.id, 'archived', 'Tarea archivada', 'Restaurada al tablero');
+
+    const [[updated]] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    res.json(updated);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al restaurar la tarea' });
+  }
+};
+
+// POST /archive-completed — archiva en bloque las completadas antiguas
+// body: { older_than_days } — 0 archiva todas las completadas
+exports.archiveCompleted = async (req, res) => {
+  try {
+    const { project_id } = req.params;
+    const days = Math.max(0, parseInt(req.body?.older_than_days ?? 30, 10) || 0);
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const [result] = await db.query(
+      `UPDATE tasks
+          SET archived_at = NOW(),
+              completed_at = COALESCE(completed_at, updated_at)
+        WHERE project_id = ?
+          AND status = 'completed'
+          AND archived_at IS NULL
+          AND COALESCE(completed_at, updated_at) <= ?`,
+      [project_id, cutoff]
+    );
+
+    res.json({ archived: result.affectedRows });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al archivar las tareas completadas' });
+  }
+};
+
+// GET /archived-count — para el contador del tablero
+exports.archivedCount = async (req, res) => {
+  try {
+    const [[row]] = await db.query(
+      'SELECT COUNT(*) AS count FROM tasks WHERE project_id = ? AND archived_at IS NOT NULL',
+      [req.params.project_id]
+    );
+    res.json({ count: Number(row.count) });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al contar las tareas archivadas' });
   }
 };
 
