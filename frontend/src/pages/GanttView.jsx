@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { tasksAPI, projectsAPI, phasesAPI } from '../services/api';
 import { fetchKanbanColumns } from '../services/columns';
+import PhasesTimeline from '../components/projects/PhasesTimeline';
 import { ChevronLeft, ChevronRight, AlertTriangle, Layers } from 'lucide-react';
 import ViewNavBar from '../components/common/ViewNavBar';
 import {
@@ -231,66 +232,12 @@ export default function GanttView() {
                       <div className="w-12 flex-shrink-0" />
                     </div>
 
-                    {phases.map(phase => {
-                      const range = getRange(phase.start_date, phase.end_date);
-                      const color = phase.color || '#6366F1';
-                      return (
-                        <div key={`phase-${phase.id}`} className="flex items-center border-b border-gray-100 dark:border-gray-800">
-                          <div className="w-56 flex-shrink-0 px-3 py-2.5 border-r border-gray-100 dark:border-gray-700">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate" title={phase.name}>
-                                {phase.name}
-                              </span>
-                            </div>
-                            {phase.total_tasks > 0 && (
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 pl-3.5">
-                                {phase.completed_tasks}/{phase.total_tasks} tareas
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex-1 relative h-11 px-1">
-                            <div className="absolute inset-0 flex pointer-events-none">
-                              {weeks.map((_, i) => (
-                                <div key={i} className="border-r border-gray-100 dark:border-gray-700/50 flex-1" />
-                              ))}
-                            </div>
-                            {range && (
-                              <div
-                                className="absolute top-1/2 -translate-y-1/2 h-7 rounded-md overflow-hidden border-2 flex items-center"
-                                style={{
-                                  left: range.left,
-                                  width: range.width,
-                                  backgroundColor: hexWithAlpha(color, isDark ? 0.22 : 0.15),
-                                  borderColor: color,
-                                }}
-                                title={`${phase.name} — ${phase.progress || 0}% de avance`}
-                              >
-                                {/* Relleno de avance dentro de la barra de fase */}
-                                <div
-                                  className="absolute inset-y-0 left-0"
-                                  style={{
-                                    width: `${phase.progress || 0}%`,
-                                    backgroundColor: hexWithAlpha(color, isDark ? 0.45 : 0.35),
-                                  }}
-                                />
-                                <span
-                                  className="relative truncate px-2 text-xs font-semibold"
-                                  style={{ color: isDark ? '#E5E7EB' : '#374151' }}
-                                >
-                                  {phase.name}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="w-12 flex-shrink-0 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 pr-2 tabular-nums">
-                            {phase.progress || 0}%
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <PhasesTimeline
+                      phases={phases}
+                      rangeStart={viewStart}
+                      rangeEnd={viewEnd}
+                      gridCount={weeksCount}
+                    />
 
                     {tasks.length > 0 && (
                       <div className="flex items-center border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40">

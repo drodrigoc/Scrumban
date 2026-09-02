@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { phasesAPI } from '../../services/api';
-import { Layers, Plus, Pencil, Trash2, Sparkles } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Layers, Plus, Sparkles } from 'lucide-react';
+import PhasesTimeline, { calcularVentana } from './PhasesTimeline';
 
 const PHASE_COLORS = [
   '#6366F1', '#0EA5E9', '#14B8A6', '#22C55E',
@@ -19,8 +18,6 @@ const PLANTILLA = [
 ];
 
 const emptyForm = { name: '', description: '', start_date: '', end_date: '', color: PHASE_COLORS[0] };
-
-const fmtDate = (d) => (d ? format(parseISO(d), 'd MMM yyyy', { locale: es }) : null);
 
 export default function PhasesPanel({ projectId, canEdit, projectStart, projectEnd, onChange }) {
   const [phases, setPhases]   = useState([]);
@@ -150,6 +147,12 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             Las actividades grandes del proyecto. El avance se calcula con las tareas de cada fase.
           </p>
+          {phases.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              12 meses desde el inicio del proyecto ·{' '}
+              <span className="capitalize">{calcularVentana(phases, projectStart, 12).etiqueta}</span>
+            </p>
+          )}
         </div>
         {canEdit && !showForm && (
           <div className="flex gap-2">
@@ -244,68 +247,23 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
           {canEdit && ' Crea el cronograma inicial con "Usar plantilla" o agrega fases una a una.'}
         </p>
       ) : (
-        <div className="space-y-2">
-          {phases.map((phase, i) => (
-            <div
-              key={phase.id}
-              className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 group"
-            >
-              <div
-                className="w-1.5 self-stretch rounded-full flex-shrink-0"
-                style={{ backgroundColor: phase.color || '#6366F1' }}
+        // Misma barra de tiempo que la vista Cronograma, ajustada a las
+        // fechas de las fases para que se vea el proyecto completo
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="min-w-[1020px]">
+              <PhasesTimeline
+                phases={phases}
+                anchorDate={projectStart}
+                monthsCount={12}
+                showHeader
+                showDates
+                canEdit={canEdit}
+                onEdit={openEdit}
+                onDelete={handleDelete}
               />
-
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono text-gray-400 dark:text-gray-500">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{phase.name}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {phase.total_tasks > 0
-                      ? `${phase.completed_tasks}/${phase.total_tasks} tareas`
-                      : 'sin tareas vinculadas'}
-                  </span>
-                </div>
-
-                {(phase.start_date || phase.end_date) && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {fmtDate(phase.start_date) || '—'} → {fmtDate(phase.end_date) || '—'}
-                  </p>
-                )}
-
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
-                  <div
-                    className="h-1.5 rounded-full transition-all"
-                    style={{ width: `${phase.progress || 0}%`, backgroundColor: phase.color || '#6366F1' }}
-                  />
-                </div>
-              </div>
-
-              <span className="text-sm font-semibold text-gray-600 dark:text-gray-300 tabular-nums w-10 text-right flex-shrink-0">
-                {phase.progress || 0}%
-              </span>
-
-              {canEdit && (
-                <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => openEdit(phase)}
-                    title="Editar fase"
-                    className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(phase)}
-                    title="Eliminar fase"
-                    className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
             </div>
-          ))}
+          </div>
         </div>
       )}
     </div>
