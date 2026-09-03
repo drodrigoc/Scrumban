@@ -39,6 +39,59 @@ const PRESET_COLORS = [
   '#3B82F6', '#0EA5E9', '#64748B', '#78716C',
 ];
 
+// Barra de avance de una subida.
+//
+// La barra mide la transferencia hasta el servidor. Con Google Drive
+// activo, al llegar al 100% empieza una segunda etapa que el navegador no
+// puede medir —el servidor subiendo a la unidad—, y por eso se cambia el
+// texto: si no, la barra parecería trabada en 100%.
+function BarraDeSubida({ nombre, porcentaje, fase, tono = 'primary' }) {
+  const colores = tono === 'green'
+    ? { borde: 'border-green-200 dark:border-green-800',   fondo: 'bg-green-50/60 dark:bg-green-900/10',   barra: 'bg-green-500',   texto: 'text-green-700 dark:text-green-400',   giro: 'border-green-500' }
+    : { borde: 'border-primary-200 dark:border-primary-800', fondo: 'bg-primary-50/60 dark:bg-primary-900/10', barra: 'bg-primary-500', texto: 'text-primary-700 dark:text-primary-400', giro: 'border-primary-500' };
+
+  const terminando = fase === 'servidor';
+
+  return (
+    <div className={`p-3 rounded-lg border ${colores.borde} ${colores.fondo} space-y-2`}>
+      <div className="flex items-center gap-2">
+        <div className={`w-3.5 h-3.5 border-2 ${colores.giro} border-t-transparent rounded-full animate-spin flex-shrink-0`} />
+        <p className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 min-w-0">{nombre}</p>
+        <span className={`text-xs font-semibold tabular-nums flex-shrink-0 ${colores.texto}`}>
+          {terminando ? 'Guardando…' : `${porcentaje}%`}
+        </span>
+      </div>
+
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={`h-1.5 rounded-full ${colores.barra} transition-all duration-200 ${terminando ? 'animate-pulse' : ''}`}
+          style={{ width: `${porcentaje}%` }}
+        />
+      </div>
+
+      <p className="text-xs text-gray-400 dark:text-gray-500">
+        {terminando
+          ? 'El archivo llegó al servidor y se está guardando. No cierres la tarea.'
+          : 'Subiendo archivo…'}
+      </p>
+    </div>
+  );
+}
+
+// Sigue el avance de una subida y traduce el evento de axios a la fase
+// que corresponde mostrar.
+function seguirAvance(setSubida) {
+  return (evento) => {
+    if (!evento.total) return;
+    const porcentaje = Math.round((evento.loaded * 100) / evento.total);
+    setSubida(actual => actual && {
+      ...actual,
+      porcentaje,
+      fase: porcentaje >= 100 ? 'servidor' : 'subiendo',
+    });
+  };
+}
+
 // Los archivos en Google Drive no tienen URL pública: se piden al backend
 // con la sesión y se entregan al navegador como descarga.
 async function descargarAdjunto(projectId, taskId, adjunto) {
@@ -60,14 +113,23 @@ async function descargarAdjunto(projectId, taskId, adjunto) {
 // Los adjuntos locales conservan su enlace directo de siempre; los de
 // Drive pasan por el backend.
 function EnlaceDescarga({ adjunto, projectId, taskId, categoria, className }) {
+  const [descargando, setDescargando] = useState(false);
+
   if (adjunto.storage_provider === 'gdrive') {
+    // El archivo viaja de Drive al servidor y de ahí al navegador, así que
+    // puede tardar un momento: sin aviso, el botón parecería no responder.
     return (
       <button
         type="button"
-        onClick={() => descargarAdjunto(projectId, taskId, adjunto)}
-        className={className}
+        disabled={descargando}
+        onClick={async () => {
+          setDescargando(true);
+          await descargarAdjunto(projectId, taskId, adjunto);
+          setDescargando(false);
+        }}
+        className={`${className} disabled:opacity-60 disabled:cursor-wait`}
       >
-        Descargar
+        {descargando ? 'Descargando…' : 'Descargar'}
       </button>
     );
   }
@@ -88,6 +150,8 @@ function EnlaceDescarga({ adjunto, projectId, taskId, categoria, className }) {
 // desmonta al cambiar de pestaña, y con el estado adentro se perdían los
 // archivos recién subidos hasta cerrar y reabrir la tarea.
 function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments }) {
+  const [subida, setSubida] = useState(null);
+
   return (
     <div className="space-y-3">
       {attachments.length === 0 && (
@@ -126,7 +190,11 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
           )}
         </div>
       ))}
-      {!readOnly && (
+      {subida && (
+        <BarraDeSubida nombre={subida.nombre} porcentaje={subida.porcentaje} fase={subida.fase} />
+      )}
+
+      {!readOnly && !subida && (
         <label className="flex items-center gap-2 p-3 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50/30 dark:hover:bg-primary-900/10 transition-colors">
           <Paperclip className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-500 dark:text-gray-400">Adjuntar archivo</span>
@@ -139,13 +207,18 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
               if (!file) return;
               const formData = new FormData();
               formData.append('file', file);
+              setSubida({ nombre: file.name, porcentaje: 0, fase: 'subiendo' });
               try {
-                const { data } = await tasksAPI.uploadAttachment(projectId, task.id, formData);
+                const { data } = await tasksAPI.uploadAttachment(
+                  projectId, task.id, formData, seguirAvance(setSubida)
+                );
                 setAttachments(prev => [...prev, { ...data, uploaded_by_name: 'Tú' }]);
                 toast.success('Archivo adjuntado');
               } catch (err) {
                 // El servidor explica por qué lo rechazó (tipo o tamaño)
                 toast.error(err.response?.data?.message || 'Error al adjuntar archivo');
+              } finally {
+                setSubida(null);
               }
               e.target.value = '';
             }}
@@ -186,6 +259,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
   const [sgcOpen, setSgcOpen]             = useState(false);
   const [sgcSaving, setSgcSaving]         = useState(false);
   const [sgcAttachments, setSgcAttachments] = useState(task?.sgc_attachments || []);
+  const [subidaSgc, setSubidaSgc]           = useState(null);
   const sgcSearchRef = useRef(null);
 
   // Local copy of labels — grows when user creates a new one inline
@@ -762,10 +836,39 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 )}
               </div>
             ))}
-            {!readOnly && (
+            {/* Sin evidencia vinculada no se puede adjuntar: un archivo de
+                evidencia que no dice qué requisito respalda no sirve para
+                una auditoría. */}
+            {!readOnly && sgcLinkedIds.length === 0 && (
+              <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Vincula primero la evidencia a la que pertenece el archivo, con el buscador de arriba.
+                  Después podrás adjuntarlo.
+                </p>
+              </div>
+            )}
+
+            {subidaSgc && (
+              <BarraDeSubida
+                nombre={subidaSgc.nombre}
+                porcentaje={subidaSgc.porcentaje}
+                fase={subidaSgc.fase}
+                tono="green"
+              />
+            )}
+
+            {!readOnly && !subidaSgc && sgcLinkedIds.length > 0 && (
               <label className="flex items-center gap-2 p-2.5 border-2 border-dashed border-green-200 dark:border-green-800 rounded-lg cursor-pointer hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-900/10 transition-colors">
                 <Paperclip className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-gray-500 dark:text-gray-400">Adjuntar archivo de evidencia</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Adjuntar archivo de evidencia
+                  {sgcLinkedIds.length > 1 && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {' '}· se guardará en las {sgcLinkedIds.length} evidencias vinculadas
+                    </span>
+                  )}
+                </span>
                 <input
                   type="file"
                   className="hidden"
@@ -775,10 +878,13 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                     if (!file) return;
                     const formData = new FormData();
                     formData.append('file', file);
+                    setSubidaSgc({ nombre: file.name, porcentaje: 0, fase: 'subiendo' });
                     try {
                       // El backend guarda una copia por cada evidencia
                       // vinculada, así que responde con un arreglo
-                      const { data } = await tasksAPI.uploadSGCAttachment(projectId, task.id, formData);
+                      const { data } = await tasksAPI.uploadSGCAttachment(
+                        projectId, task.id, formData, seguirAvance(setSubidaSgc)
+                      );
                       const nuevos = (Array.isArray(data) ? data : [data])
                         .map(adj => ({ ...adj, uploaded_by_name: 'Tú' }));
 
@@ -788,6 +894,8 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                         : 'Archivo adjuntado');
                     } catch (err) {
                       toast.error(err.response?.data?.message || 'Error al adjuntar archivo');
+                    } finally {
+                      setSubidaSgc(null);
                     }
                     e.target.value = '';
                   }}

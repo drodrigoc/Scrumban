@@ -117,8 +117,12 @@ export const tasksAPI = {
   getArchivedCount: (projectId) => api.get(`/projects/${projectId}/tasks/archived-count`),
   addComment: (projectId, id, content) => api.post(`/projects/${projectId}/tasks/${id}/comments`, { content }),
   deleteComment: (projectId, id, commentId) => api.delete(`/projects/${projectId}/tasks/${id}/comments/${commentId}`),
-  uploadAttachment: (projectId, id, formData) =>
-    api.post(`/projects/${projectId}/tasks/${id}/attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  // onUploadProgress recibe el avance de la transferencia al backend
+  uploadAttachment: (projectId, id, formData, onUploadProgress) =>
+    api.post(`/projects/${projectId}/tasks/${id}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
+    }),
   deleteAttachment: (projectId, id, attachmentId) =>
     api.delete(`/projects/${projectId}/tasks/${id}/attachments/${attachmentId}`),
   // Descarga con sesión — necesaria para los archivos de Google Drive,
@@ -127,8 +131,11 @@ export const tasksAPI = {
     api.get(`/projects/${projectId}/tasks/${id}/attachments/${attachmentId}/download`, {
       responseType: 'blob',
     }),
-  uploadSGCAttachment: (projectId, id, formData) =>
-    api.post(`/projects/${projectId}/tasks/${id}/sgc-attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  uploadSGCAttachment: (projectId, id, formData, onUploadProgress) =>
+    api.post(`/projects/${projectId}/tasks/${id}/sgc-attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress,
+    }),
   deleteSGCAttachment: (projectId, id, attachmentId) =>
     api.delete(`/projects/${projectId}/tasks/${id}/sgc-attachments/${attachmentId}`),
   // Checklist

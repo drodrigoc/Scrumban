@@ -621,11 +621,19 @@ exports.uploadSGCAttachment = async (req, res) => {
       [req.params.id]
     );
 
+    // Un archivo de evidencia sin evidencia asignada no sirve para una
+    // auditoría: no hay forma de saber qué requisito respalda.
+    if (evidencias.length === 0) {
+      return res.status(400).json({
+        message: 'Primero vincula la evidencia SGC a la que pertenece este archivo, y luego adjúntalo.',
+      });
+    }
+
     // Sin Drive el archivo está una sola vez en disco: duplicar registros
     // dejaría varias filas apuntando al mismo archivo, y borrar una
     // rompería las demás. En ese caso se guarda una sola.
-    if (!gdrive.isEnabled() || evidencias.length === 0) {
-      return res.status(201).json([await guardarAdjunto(req, 'sgc', evidencias[0] || null)]);
+    if (!gdrive.isEnabled()) {
+      return res.status(201).json([await guardarAdjunto(req, 'sgc', evidencias[0])]);
     }
 
     // En serie, no en paralelo: dos subidas simultáneas podrían crear la
