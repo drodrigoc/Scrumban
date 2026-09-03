@@ -435,27 +435,106 @@ exports.deleteComment = async (req, res) => {
   }
 };
 
+// ── Adjuntos ─────────────────────────────────────────────────────────────
+// Cada archivo vive en el disco del servidor o en la Unidad Compartida de
+// Google Drive, según estuviera configurado Drive al momento de subirlo.
+// Los dos conviven: storage_provider dice de dónde sacarlo.
+
 const fs   = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
+const gdrive = require('../services/gdrive');
 const BASE_UPLOAD = process.env.UPLOAD_PATH || './uploads';
+
+// Los adjuntos antiguos quedaron en la raíz de uploads/ y los siguientes
+// en subcarpetas por categoría, así que se busca en ambos sitios.
+function rutaLocal(attachment) {
+  const sub = attachment.category === 'sgc' ? 'sgc' : 'tasks';
+  const candidatos = [
+    path.join(BASE_UPLOAD, sub, attachment.filepath),
+    path.join(BASE_UPLOAD, attachment.filepath),
+  ];
+  return candidatos.find(p => fs.existsSync(p)) || null;
+}
+
+// Carpeta del proyecto dentro de la unidad. Se crea la primera vez que se
+// sube algo y se recuerda en projects.gdrive_folder_id.
+async function carpetaDelProyecto(projectId) {
+  const [[proyecto]] = await db.query(
+    'SELECT name, gdrive_folder_id FROM projects WHERE id = ?', [projectId]
+  );
+  if (!proyecto) throw new Error(`Proyecto ${projectId} no encontrado`);
+  if (proyecto.gdrive_folder_id) return proyecto.gdrive_folder_id;
+
+  // El sufijo con el id evita confundir dos proyectos con el mismo nombre
+  const folderId = await gdrive.ensureFolder(`${proyecto.name} (#${projectId})`);
+  await db.query('UPDATE projects SET gdrive_folder_id = ? WHERE id = ?', [folderId, projectId]);
+  return folderId;
+}
+
+async function guardarAdjunto(req, category) {
+  const file = req.file;
+  let storage = 'local';
+  let externalId = null;
+  let filepath = file.filename;
+
+  // Con Drive activo multer entrega el archivo en memoria, no en disco
+  if (gdrive.isEnabled() && file.buffer) {
+    const parentId = await carpetaDelProyecto(req.params.project_id);
+    const subido = await gdrive.uploadFile({
+      name:     file.originalname,
+      mimeType: file.mimetype,
+      buffer:   file.buffer,
+      parentId,
+    });
+    storage    = 'gdrive';
+    externalId = subido.id;
+    filepath   = subido.id;
+  }
+
+  const [result] = await db.query(
+    `INSERT INTO task_attachments
+       (task_id, user_id, filename, filepath, filesize, mimetype, category, storage_provider, external_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [req.params.id, req.user.id, file.originalname, filepath,
+     file.size, file.mimetype, category, storage, externalId]
+  );
+
+  return {
+    id:               result.insertId,
+    filename:         file.originalname,
+    filepath,
+    filesize:         file.size,
+    mimetype:         file.mimetype,
+    category,
+    storage_provider: storage,
+    external_id:      externalId,
+  };
+}
+
+async function eliminarAdjunto(attachment) {
+  if (attachment.storage_provider === 'gdrive' && attachment.external_id) {
+    // Si falla el borrado en Drive se registra pero no se aborta: el
+    // registro debe irse igual para no dejar un adjunto fantasma.
+    try {
+      await gdrive.deleteFile(attachment.external_id);
+    } catch (error) {
+      logger.error('No se pudo eliminar el archivo en Drive', {
+        fileId: attachment.external_id, message: error.message,
+      });
+    }
+  } else {
+    const ruta = rutaLocal(attachment);
+    if (ruta) fs.unlinkSync(ruta);
+  }
+
+  await db.query('DELETE FROM task_attachments WHERE id = ?', [attachment.id]);
+}
 
 exports.uploadAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
-
-    const [result] = await db.query(
-      'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'task']
-    );
-
-    res.status(201).json({
-      id: result.insertId,
-      filename: req.file.originalname,
-      filepath: req.file.filename,
-      filesize: req.file.size,
-      mimetype: req.file.mimetype,
-      category: 'task',
-    });
+    res.status(201).json(await guardarAdjunto(req, 'task'));
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al subir archivo' });
@@ -464,15 +543,15 @@ exports.uploadAttachment = async (req, res) => {
 
 exports.deleteAttachment = async (req, res) => {
   try {
-    const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'task']);
+    const [attachments] = await db.query(
+      'SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'task']
+    );
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const filePath = path.join(BASE_UPLOAD, attachments[0].filepath);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-    await db.query('DELETE FROM task_attachments WHERE id = ?', [req.params.attachmentId]);
+    await eliminarAdjunto(attachments[0]);
     res.json({ message: 'Archivo eliminado' });
   } catch (error) {
+    logger.error(error);
     res.status(500).json({ message: 'Error al eliminar archivo' });
   }
 };
@@ -480,20 +559,7 @@ exports.deleteAttachment = async (req, res) => {
 exports.uploadSGCAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
-
-    const [result] = await db.query(
-      'INSERT INTO task_attachments (task_id, user_id, filename, filepath, filesize, mimetype, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.params.id, req.user.id, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, 'sgc']
-    );
-
-    res.status(201).json({
-      id: result.insertId,
-      filename: req.file.originalname,
-      filepath: req.file.filename,
-      filesize: req.file.size,
-      mimetype: req.file.mimetype,
-      category: 'sgc',
-    });
+    res.status(201).json(await guardarAdjunto(req, 'sgc'));
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al subir archivo SGC' });
@@ -502,16 +568,51 @@ exports.uploadSGCAttachment = async (req, res) => {
 
 exports.deleteSGCAttachment = async (req, res) => {
   try {
-    const [attachments] = await db.query('SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'sgc']);
+    const [attachments] = await db.query(
+      'SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'sgc']
+    );
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    const filePath = path.join(BASE_UPLOAD, attachments[0].filepath);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
-    await db.query('DELETE FROM task_attachments WHERE id = ?', [req.params.attachmentId]);
+    await eliminarAdjunto(attachments[0]);
     res.json({ message: 'Archivo eliminado' });
   } catch (error) {
+    logger.error(error);
     res.status(500).json({ message: 'Error al eliminar archivo SGC' });
+  }
+};
+
+// GET /:id/attachments/:attachmentId/download
+// Los archivos de Drive no son públicos: el backend los transmite usando
+// la sesión de quien los pide. Sirve también los locales, por uniformidad.
+exports.downloadAttachment = async (req, res) => {
+  try {
+    const [[attachment]] = await db.query(
+      'SELECT * FROM task_attachments WHERE id = ?', [req.params.attachmentId]
+    );
+    if (!attachment) return res.status(404).json({ message: 'Archivo no encontrado' });
+
+    if (attachment.storage_provider === 'gdrive' && attachment.external_id) {
+      const upstream = await gdrive.getFileResponse(attachment.external_id);
+
+      // filename* cubre los nombres con acentos; filename queda de respaldo
+      const seguro = attachment.filename.replace(/["\\]/g, '_');
+      res.setHeader('Content-Type', attachment.mimetype || 'application/octet-stream');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${seguro}"; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`
+      );
+      const largo = upstream.headers.get('content-length');
+      if (largo) res.setHeader('Content-Length', largo);
+
+      return Readable.fromWeb(upstream.body).pipe(res);
+    }
+
+    const ruta = rutaLocal(attachment);
+    if (!ruta) return res.status(404).json({ message: 'El archivo ya no está en el servidor' });
+    return res.download(ruta, attachment.filename);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al descargar el archivo' });
   }
 };
 

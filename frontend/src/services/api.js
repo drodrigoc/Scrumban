@@ -121,6 +121,12 @@ export const tasksAPI = {
     api.post(`/projects/${projectId}/tasks/${id}/attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   deleteAttachment: (projectId, id, attachmentId) =>
     api.delete(`/projects/${projectId}/tasks/${id}/attachments/${attachmentId}`),
+  // Descarga con sesión — necesaria para los archivos de Google Drive,
+  // que no tienen URL pública
+  downloadAttachment: (projectId, id, attachmentId) =>
+    api.get(`/projects/${projectId}/tasks/${id}/attachments/${attachmentId}/download`, {
+      responseType: 'blob',
+    }),
   uploadSGCAttachment: (projectId, id, formData) =>
     api.post(`/projects/${projectId}/tasks/${id}/sgc-attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   deleteSGCAttachment: (projectId, id, attachmentId) =>

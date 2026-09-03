@@ -35,6 +35,51 @@ const PRESET_COLORS = [
   '#3B82F6', '#0EA5E9', '#64748B', '#78716C',
 ];
 
+// Los archivos en Google Drive no tienen URL pública: se piden al backend
+// con la sesión y se entregan al navegador como descarga.
+async function descargarAdjunto(projectId, taskId, adjunto) {
+  try {
+    const { data } = await tasksAPI.downloadAttachment(projectId, taskId, adjunto.id);
+    const url = URL.createObjectURL(data);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = adjunto.filename;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Error al descargar el archivo');
+  }
+}
+
+// Los adjuntos locales conservan su enlace directo de siempre; los de
+// Drive pasan por el backend.
+function EnlaceDescarga({ adjunto, projectId, taskId, categoria, className }) {
+  if (adjunto.storage_provider === 'gdrive') {
+    return (
+      <button
+        type="button"
+        onClick={() => descargarAdjunto(projectId, taskId, adjunto)}
+        className={className}
+      >
+        Descargar
+      </button>
+    );
+  }
+
+  return (
+    <a
+      href={getUploadUrl(categoria, adjunto.filepath)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+    >
+      Descargar
+    </a>
+  );
+}
+
 function AttachmentsTab({ task, projectId, readOnly }) {
   const [attachments, setAttachments] = useState(task?.attachments || []);
 
@@ -50,14 +95,13 @@ function AttachmentsTab({ task, projectId, readOnly }) {
             <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{a.filename}</p>
             <p className="text-xs text-gray-400">Por {a.uploaded_by_name}</p>
           </div>
-          <a
-            href={getUploadUrl('task', a.filepath)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <EnlaceDescarga
+            adjunto={a}
+            projectId={projectId}
+            taskId={task.id}
+            categoria="task"
             className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
-          >
-            Descargar
-          </a>
+          />
           {!readOnly && (
             <button
               type="button"
@@ -672,14 +716,13 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                   <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{a.filename}</p>
                   <p className="text-xs text-gray-400">Por {a.uploaded_by_name}</p>
                 </div>
-                <a
-                  href={getUploadUrl('sgc', a.filepath)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <EnlaceDescarga
+                  adjunto={a}
+                  projectId={projectId}
+                  taskId={task.id}
+                  categoria="sgc"
                   className="text-xs text-green-600 dark:text-green-400 hover:underline flex-shrink-0"
-                >
-                  Descargar
-                </a>
+                />
                 {!readOnly && (
                   <button
                     type="button"

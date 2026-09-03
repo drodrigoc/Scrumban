@@ -11,6 +11,8 @@ router.use(authenticate);
 router.get('/',                ctrl.getByProject);
 router.get('/archived-count',  ctrl.archivedCount);
 router.get('/:id',             ctrl.getById);
+// Descarga con sesión: los archivos de Drive no son públicos
+router.get('/:id/attachments/:attachmentId/download', ctrl.downloadAttachment);
 
 // Escritura — bloqueado para viewers del proyecto
 router.post('/',                    denyProjectViewer, ctrl.create);

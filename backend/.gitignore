@@ -2,3 +2,11 @@ node_modules/
 .env
 uploads/
 logs/
+
+# Credenciales de cuentas de servicio de Google — NUNCA se versionan.
+# Quien tenga este archivo puede escribir en la Unidad Compartida.
+*.iam.gserviceaccount.com.json
+service-account*.json
+credentials*.json
+gdrive-*.json
+sistema-de-calidad-*.json

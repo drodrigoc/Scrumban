@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const gdrive = require('../services/gdrive');
 
 const baseDir = process.env.UPLOAD_PATH || './uploads';
 const tasksDir = path.join(baseDir, 'tasks');
@@ -35,7 +36,13 @@ const makeStorage = (dest) => multer.diskStorage({
   },
 });
 
-const uploadTask = multer({ storage: makeStorage(tasksDir), fileFilter, limits });
-const uploadSGC  = multer({ storage: makeStorage(sgcDir),   fileFilter, limits });
+// Con Google Drive configurado el archivo no toca el disco: se recibe en
+// memoria y el controlador lo sube a la Unidad Compartida. Sin Drive, se
+// guarda en disco como siempre.
+const almacenamiento = (dest) =>
+  gdrive.isEnabled() ? multer.memoryStorage() : makeStorage(dest);
+
+const uploadTask = multer({ storage: almacenamiento(tasksDir), fileFilter, limits });
+const uploadSGC  = multer({ storage: almacenamiento(sgcDir),   fileFilter, limits });
 
 module.exports = { uploadTask, uploadSGC };

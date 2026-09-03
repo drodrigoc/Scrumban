@@ -77,6 +77,18 @@ app.listen(PORT, HOST, () => {
     red:   `http://${process.env.SERVER_IP || '10.10.25.10'}:${PORT}`,
     mode:  process.env.NODE_ENV || 'development',
   });
+
+  // Dónde van a parar los adjuntos, visible desde el arranque
+  const gdrive = require('./services/gdrive');
+  if (!gdrive.isEnabled()) {
+    logger.info('Adjuntos: disco local (Google Drive no configurado)');
+  } else {
+    gdrive.checkConnection()
+      .then(nombre => logger.info('Adjuntos: Google Drive', { unidad: nombre }))
+      .catch(error => logger.error('Google Drive configurado pero inaccesible', {
+        message: error.message,
+      }));
+  }
 });
 
 module.exports = app;
