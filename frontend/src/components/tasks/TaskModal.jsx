@@ -179,8 +179,8 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
                   await tasksAPI.deleteAttachment(projectId, task.id, a.id);
                   setAttachments(prev => prev.filter(x => x.id !== a.id));
                   toast.success('Archivo eliminado');
-                } catch {
-                  toast.error('Error al eliminar archivo');
+                } catch (err) {
+                  toast.error(err.response?.data?.message || 'Error al eliminar archivo');
                 }
               }}
               className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
@@ -355,6 +355,23 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       toast.error('Error al actualizar SGC');
     } finally {
       setSgcSaving(false);
+    }
+  };
+
+  // Evidencias vinculadas a la tarea: son las opciones válidas para
+  // clasificar sus archivos
+  const evidenciasVinculadas = sgcEvidencias.filter(e => sgcLinkedIds.includes(e.id));
+
+  const reasignarEvidencia = async (adjunto, evidenciaId) => {
+    if (!evidenciaId || evidenciaId === adjunto.evidencia_id) return;
+    try {
+      const { data } = await tasksAPI.reassignSGCAttachment(
+        projectId, task.id, adjunto.id, evidenciaId
+      );
+      setSgcAttachments(prev => prev.map(x => x.id === adjunto.id ? { ...x, ...data } : x));
+      toast.success(`Archivo movido a ${data.evidencia_codigo}`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error al cambiar la evidencia');
     }
   };
 
@@ -758,7 +775,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                       key={e.id}
                       type="button"
                       onMouseDown={ev => ev.preventDefault()}
-                      onClick={() => { toggleSgc(e.id); setSgcSearch(''); }}
+                      onClick={() => { toggleSgc(e.id); setSgcSearch(''); setSgcOpen(false); }}
                       className={`w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${linked ? 'bg-primary-50 dark:bg-primary-900/30' : ''}`}
                     >
                       <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400 w-14 flex-shrink-0">{e.evidencia}</span>
@@ -798,8 +815,26 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 <Paperclip className="w-4 h-4 text-green-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{a.filename}</p>
-                  <p className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
-                    {a.evidencia_codigo && (
+                  <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                    {/* El código es también el control para corregirlo: si se
+                        vinculó la evidencia equivocada, se cambia aquí y el
+                        archivo se mueve de carpeta en Drive. */}
+                    {!readOnly && evidenciasVinculadas.length > 0 ? (
+                      <select
+                        value={a.evidencia_id || ''}
+                        onChange={e => reasignarEvidencia(a, parseInt(e.target.value, 10))}
+                        title="Evidencia a la que pertenece este archivo"
+                        className="font-mono font-semibold text-green-700 dark:text-green-400
+                                   bg-transparent border border-transparent hover:border-green-300
+                                   dark:hover:border-green-700 rounded px-1 py-0.5 cursor-pointer
+                                   focus:outline-none focus:border-green-400"
+                      >
+                        {!a.evidencia_id && <option value="">Sin evidencia</option>}
+                        {evidenciasVinculadas.map(ev => (
+                          <option key={ev.id} value={ev.id}>{ev.evidencia}</option>
+                        ))}
+                      </select>
+                    ) : a.evidencia_codigo && (
                       <span
                         className="font-mono font-semibold text-green-700 dark:text-green-400"
                         title={a.nombre_evidencia}
@@ -808,7 +843,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                       </span>
                     )}
                     <span>Por {a.uploaded_by_name}</span>
-                  </p>
+                  </div>
                 </div>
                 <EnlaceDescarga
                   adjunto={a}
@@ -825,8 +860,8 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                         await tasksAPI.deleteSGCAttachment(projectId, task.id, a.id);
                         setSgcAttachments(prev => prev.filter(x => x.id !== a.id));
                         toast.success('Archivo eliminado');
-                      } catch {
-                        toast.error('Error al eliminar archivo');
+                      } catch (err) {
+                        toast.error(err.response?.data?.message || 'Error al eliminar archivo');
                       }
                     }}
                     className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"

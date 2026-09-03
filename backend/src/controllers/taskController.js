@@ -564,15 +564,10 @@ async function guardarAdjunto(req, category, evidencia = null) {
 
 async function eliminarAdjunto(attachment) {
   if (attachment.storage_provider === 'gdrive' && attachment.external_id) {
-    // Si falla el borrado en Drive se registra pero no se aborta: el
-    // registro debe irse igual para no dejar un adjunto fantasma.
-    try {
-      await gdrive.deleteFile(attachment.external_id);
-    } catch (error) {
-      logger.error('No se pudo eliminar el archivo en Drive', {
-        fileId: attachment.external_id, message: error.message,
-      });
-    }
+    // Si Drive no lo elimina, tampoco se quita de la tarea: antes el error
+    // se silenciaba y el archivo desaparecía de la vista pero seguía en la
+    // unidad, que es peor que no borrarlo.
+    await gdrive.deleteFile(attachment.external_id);
   } else {
     const ruta = rutaLocal(attachment);
     if (ruta) fs.unlinkSync(ruta);
@@ -602,7 +597,10 @@ exports.deleteAttachment = async (req, res) => {
     res.json({ message: 'Archivo eliminado' });
   } catch (error) {
     logger.error(error);
-    res.status(500).json({ message: 'Error al eliminar archivo' });
+    res.status(500).json({
+      message: 'No se pudo eliminar el archivo del almacenamiento, así que sigue en la tarea. ' +
+               'Vuelve a intentarlo; si persiste, revisa los permisos de la cuenta de servicio en la unidad.',
+    });
   }
 };
 
@@ -661,7 +659,62 @@ exports.deleteSGCAttachment = async (req, res) => {
     res.json({ message: 'Archivo eliminado' });
   } catch (error) {
     logger.error(error);
-    res.status(500).json({ message: 'Error al eliminar archivo SGC' });
+    res.status(500).json({
+      message: 'No se pudo eliminar el archivo de Google Drive, así que sigue en la evidencia. ' +
+               'Vuelve a intentarlo; si persiste, revisa que la cuenta de servicio sea ' +
+               '"Administrador de contenido" en la unidad.',
+    });
+  }
+};
+
+// PATCH /:id/sgc-attachments/:attachmentId  { evidencia_id }
+// Corrige la evidencia de un archivo ya subido: en Drive lo mueve a la
+// carpeta correcta, no lo duplica.
+exports.reassignSGCAttachment = async (req, res) => {
+  try {
+    const { evidencia_id } = req.body;
+
+    const [[attachment]] = await db.query(
+      'SELECT * FROM task_attachments WHERE id = ? AND category = ?',
+      [req.params.attachmentId, 'sgc']
+    );
+    if (!attachment) return res.status(404).json({ message: 'Archivo no encontrado' });
+
+    const [[evidencia]] = await db.query(
+      'SELECT * FROM sgc_evidencias WHERE id = ?', [evidencia_id]
+    );
+    if (!evidencia) return res.status(400).json({ message: 'La evidencia indicada no existe' });
+
+    if (attachment.evidencia_id === evidencia.id) {
+      return res.status(400).json({ message: 'El archivo ya pertenece a esa evidencia' });
+    }
+
+    if (attachment.storage_provider === 'gdrive' && attachment.external_id) {
+      const destino = await carpetaSGC(evidencia, req.params.project_id);
+      await gdrive.moveFile(attachment.external_id, destino);
+    }
+
+    await db.query(
+      'UPDATE task_attachments SET evidencia_id = ? WHERE id = ?', [evidencia.id, attachment.id]
+    );
+
+    // Que la corrección quede registrada: es trazabilidad de calidad
+    await logHistory(
+      req.params.id, req.user.id, 'evidencia',
+      attachment.filename, `Reasignado a ${evidencia.evidencia}`
+    );
+
+    res.json({
+      ...attachment,
+      evidencia_id:     evidencia.id,
+      evidencia_codigo: evidencia.evidencia,
+      nombre_evidencia: evidencia.nombre_evidencia,
+    });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({
+      message: 'No se pudo mover el archivo a la otra evidencia. Vuelve a intentarlo.',
+    });
   }
 };
 

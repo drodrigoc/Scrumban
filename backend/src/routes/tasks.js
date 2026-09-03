@@ -30,6 +30,7 @@ router.post('/:id/attachments',                    denyProjectViewer, uploadTask
 router.delete('/:id/attachments/:attachmentId',    denyProjectViewer, ctrl.deleteAttachment);
 
 router.post('/:id/sgc-attachments',                denyProjectViewer, uploadSGC.single('file'), ctrl.uploadSGCAttachment);
+router.patch('/:id/sgc-attachments/:attachmentId', denyProjectViewer, ctrl.reassignSGCAttachment);
 router.delete('/:id/sgc-attachments/:attachmentId', denyProjectViewer, ctrl.deleteSGCAttachment);
 
 module.exports = router;

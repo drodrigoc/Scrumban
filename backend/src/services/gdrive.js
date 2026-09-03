@@ -186,12 +186,50 @@ async function getFileResponse(fileId) {
   return res;
 }
 
+/**
+ * Elimina un archivo de la unidad.
+ *
+ * Se manda primero a la papelera en vez de borrarlo definitivamente: en
+ * una Unidad Compartida el rol "Administrador de contenido" puede enviar
+ * a la papelera, pero el borrado permanente suele estar reservado al rol
+ * "Administrador". Además deja 30 días para recuperar un archivo que se
+ * eliminó por error, algo deseable tratándose de evidencias.
+ *
+ * Si la papelera falla se intenta el borrado directo, por si la unidad
+ * está configurada de otra forma.
+ */
 async function deleteFile(fileId) {
-  const res = await api(`${API}/files/${fileId}?supportsAllDrives=true`, { method: 'DELETE' });
+  const aPapelera = await api(`${API}/files/${fileId}?supportsAllDrives=true`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ trashed: true }),
+  });
+
   // 404 = ya no existe; para nuestro propósito es un borrado exitoso
-  if (!res.ok && res.status !== 404) {
-    throw new Error(`No se pudo eliminar el archivo de Drive (${res.status})`);
-  }
+  if (aPapelera.ok || aPapelera.status === 404) return;
+
+  const borrado = await api(`${API}/files/${fileId}?supportsAllDrives=true`, { method: 'DELETE' });
+  if (borrado.ok || borrado.status === 404) return;
+
+  const detalle = await borrado.text().catch(() => '');
+  throw new Error(`Drive rechazó eliminar el archivo (${borrado.status}). ${detalle}`);
+}
+
+/**
+ * Mueve un archivo a otra carpeta de la unidad. Drive no tiene "mover":
+ * se cambia de padre, así que primero hay que saber cuál tiene.
+ */
+async function moveFile(fileId, nuevoParentId) {
+  const actual = await apiJson(`${API}/files/${fileId}?fields=parents&supportsAllDrives=true`);
+
+  const params = new URLSearchParams({
+    supportsAllDrives: 'true',
+    addParents: nuevoParentId,
+    fields: 'id,parents',
+  });
+  if (actual.parents?.length) params.set('removeParents', actual.parents.join(','));
+
+  return apiJson(`${API}/files/${fileId}?${params}`, { method: 'PATCH' });
 }
 
 /** Comprobación de arranque: confirma que la unidad es accesible. */
@@ -207,6 +245,7 @@ module.exports = {
   uploadFile,
   getFileResponse,
   deleteFile,
+  moveFile,
   checkConnection,
   DRIVE_ID,
 };

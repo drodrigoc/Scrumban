@@ -138,6 +138,11 @@ export const tasksAPI = {
     }),
   deleteSGCAttachment: (projectId, id, attachmentId) =>
     api.delete(`/projects/${projectId}/tasks/${id}/sgc-attachments/${attachmentId}`),
+  // Corrige a qué evidencia pertenece un archivo ya subido
+  reassignSGCAttachment: (projectId, id, attachmentId, evidenciaId) =>
+    api.patch(`/projects/${projectId}/tasks/${id}/sgc-attachments/${attachmentId}`, {
+      evidencia_id: evidenciaId,
+    }),
   // Checklist
   getChecklist: (projectId, taskId) =>
     api.get(`/projects/${projectId}/tasks/${taskId}/checklist`),
