@@ -63,6 +63,13 @@ app.use((err, req, res, next) => {
     url:     req.originalUrl,
     userId:  req.user?.id,
   });
+
+  // multer avisa del límite de tamaño en inglés y sin código de estado
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    const mb = Math.round((parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024) / (1024 * 1024));
+    return res.status(400).json({ message: `El archivo supera el límite de ${mb} MB` });
+  }
+
   res.status(err.status || 500).json({
     message: err.message || 'Error interno del servidor',
   });

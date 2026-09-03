@@ -28,6 +28,10 @@ const historyFieldLabels = {
   phase: 'la fase', archived: 'el archivado',
 };
 
+// Formatos que acepta el backend. Filtra el explorador de archivos para
+// que no se pueda elegir algo que luego sería rechazado.
+const TIPOS_ACEPTADOS = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.rtf,.zip';
+
 // Colores predefinidos para nuevas etiquetas
 const PRESET_COLORS = [
   '#6366F1', '#8B5CF6', '#EC4899', '#EF4444',
@@ -80,9 +84,10 @@ function EnlaceDescarga({ adjunto, projectId, taskId, categoria, className }) {
   );
 }
 
-function AttachmentsTab({ task, projectId, readOnly }) {
-  const [attachments, setAttachments] = useState(task?.attachments || []);
-
+// La lista de adjuntos vive en TaskModal, no aquí: esta pestaña se
+// desmonta al cambiar de pestaña, y con el estado adentro se perdían los
+// archivos recién subidos hasta cerrar y reabrir la tarea.
+function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments }) {
   return (
     <div className="space-y-3">
       {attachments.length === 0 && (
@@ -128,6 +133,7 @@ function AttachmentsTab({ task, projectId, readOnly }) {
           <input
             type="file"
             className="hidden"
+            accept={TIPOS_ACEPTADOS}
             onChange={async (e) => {
               const file = e.target.files[0];
               if (!file) return;
@@ -137,8 +143,9 @@ function AttachmentsTab({ task, projectId, readOnly }) {
                 const { data } = await tasksAPI.uploadAttachment(projectId, task.id, formData);
                 setAttachments(prev => [...prev, { ...data, uploaded_by_name: 'Tú' }]);
                 toast.success('Archivo adjuntado');
-              } catch {
-                toast.error('Error al adjuntar archivo');
+              } catch (err) {
+                // El servidor explica por qué lo rechazó (tipo o tamaño)
+                toast.error(err.response?.data?.message || 'Error al adjuntar archivo');
               }
               e.target.value = '';
             }}
@@ -168,6 +175,9 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
 
   // Fases del cronograma macro del proyecto
   const [phases, setPhases] = useState([]);
+
+  // Adjuntos de la tarea — aquí arriba para que sobrevivan al cambio de pestaña
+  const [attachments, setAttachments] = useState(task?.attachments || []);
 
   // SGC state
   const [sgcEvidencias, setSgcEvidencias] = useState([]);
@@ -361,7 +371,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       { id: 'sgc',         label: `SGC${sgcLinkedIds.length ? ` (${sgcLinkedIds.length})` : ''}` },
       { id: 'comments',    label: `Comentarios${task.comments?.length ? ` (${task.comments.length})` : ''}` },
       { id: 'history',     label: 'Historial' },
-      { id: 'attachments', label: 'Archivos' },
+      { id: 'attachments', label: attachments.length ? `Archivos (${attachments.length})` : 'Archivos' },
     ] : []),
   ];
 
@@ -714,7 +724,17 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 <Paperclip className="w-4 h-4 text-green-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{a.filename}</p>
-                  <p className="text-xs text-gray-400">Por {a.uploaded_by_name}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                    {a.evidencia_codigo && (
+                      <span
+                        className="font-mono font-semibold text-green-700 dark:text-green-400"
+                        title={a.nombre_evidencia}
+                      >
+                        {a.evidencia_codigo}
+                      </span>
+                    )}
+                    <span>Por {a.uploaded_by_name}</span>
+                  </p>
                 </div>
                 <EnlaceDescarga
                   adjunto={a}
@@ -749,17 +769,25 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 <input
                   type="file"
                   className="hidden"
+                  accept={TIPOS_ACEPTADOS}
                   onChange={async (e) => {
                     const file = e.target.files[0];
                     if (!file) return;
                     const formData = new FormData();
                     formData.append('file', file);
                     try {
+                      // El backend guarda una copia por cada evidencia
+                      // vinculada, así que responde con un arreglo
                       const { data } = await tasksAPI.uploadSGCAttachment(projectId, task.id, formData);
-                      setSgcAttachments(prev => [...prev, { ...data, uploaded_by_name: 'Tú' }]);
-                      toast.success('Archivo adjuntado');
-                    } catch {
-                      toast.error('Error al adjuntar archivo');
+                      const nuevos = (Array.isArray(data) ? data : [data])
+                        .map(adj => ({ ...adj, uploaded_by_name: 'Tú' }));
+
+                      setSgcAttachments(prev => [...prev, ...nuevos]);
+                      toast.success(nuevos.length > 1
+                        ? `Archivo adjuntado a ${nuevos.length} evidencias`
+                        : 'Archivo adjuntado');
+                    } catch (err) {
+                      toast.error(err.response?.data?.message || 'Error al adjuntar archivo');
                     }
                     e.target.value = '';
                   }}
@@ -923,6 +951,8 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
           task={task}
           projectId={projectId}
           readOnly={readOnly}
+          attachments={attachments}
+          setAttachments={setAttachments}
         />
       )}
     </div>

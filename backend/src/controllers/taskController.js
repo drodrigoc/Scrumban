@@ -118,9 +118,14 @@ exports.getById = async (req, res) => {
     `, [req.params.id]);
 
     const [sgcAttachments] = await db.query(`
-      SELECT ta.*, u.name as uploaded_by_name
-      FROM task_attachments ta JOIN users u ON u.id = ta.user_id
-      WHERE ta.task_id = ? AND ta.category = 'sgc' ORDER BY ta.created_at DESC
+      SELECT ta.*, u.name as uploaded_by_name,
+             e.evidencia AS evidencia_codigo, e.nombre_evidencia,
+             e.dimension, e.criterio
+      FROM task_attachments ta
+      JOIN users u ON u.id = ta.user_id
+      LEFT JOIN sgc_evidencias e ON e.id = ta.evidencia_id
+      WHERE ta.task_id = ? AND ta.category = 'sgc'
+      ORDER BY e.evidencia IS NULL, e.evidencia, ta.created_at DESC
     `, [req.params.id]);
 
     const [history] = await db.query(`
@@ -457,22 +462,61 @@ function rutaLocal(attachment) {
   return candidatos.find(p => fs.existsSync(p)) || null;
 }
 
-// Carpeta del proyecto dentro de la unidad. Se crea la primera vez que se
-// sube algo y se recuerda en projects.gdrive_folder_id.
-async function carpetaDelProyecto(projectId) {
-  const [[proyecto]] = await db.query(
-    'SELECT name, gdrive_folder_id FROM projects WHERE id = ?', [projectId]
-  );
-  if (!proyecto) throw new Error(`Proyecto ${projectId} no encontrado`);
-  if (proyecto.gdrive_folder_id) return proyecto.gdrive_folder_id;
+// La unidad se organiza en dos carpetas principales, y dentro de cada una
+// una carpeta por proyecto:
+//
+//   Unidad Compartida/
+//   ├── Documentos/  → adjuntos de tareas
+//   │   └── Alumni (#3)/
+//   └── SGC/         → evidencias de calidad, listas para auditoría
+//       └── Alumni (#3)/
+//
+// Separarlas permite compartir solo SGC con un auditor sin exponer el
+// resto de los archivos del proyecto.
+const CARPETAS_RAIZ = {
+  task: process.env.GDRIVE_FOLDER_DOCUMENTOS || 'Documentos',
+  sgc:  process.env.GDRIVE_FOLDER_SGC        || 'SGC',
+};
 
+// Drive acepta casi cualquier nombre, pero una barra dentro del nombre se
+// lee como si fuera otra carpeta. Se sustituye y se recorta el largo.
+const nombreCarpeta = (texto, max = 120) =>
+  String(texto).replace(/[/\\]/g, '-').replace(/\s+/g, ' ').trim().slice(0, max) || 'Sin nombre';
+
+async function nombreProyecto(projectId) {
+  const [[proyecto]] = await db.query('SELECT name FROM projects WHERE id = ?', [projectId]);
+  if (!proyecto) throw new Error(`Proyecto ${projectId} no encontrado`);
   // El sufijo con el id evita confundir dos proyectos con el mismo nombre
-  const folderId = await gdrive.ensureFolder(`${proyecto.name} (#${projectId})`);
-  await db.query('UPDATE projects SET gdrive_folder_id = ? WHERE id = ?', [folderId, projectId]);
-  return folderId;
+  return `${nombreCarpeta(proyecto.name)} (#${projectId})`;
 }
 
-async function guardarAdjunto(req, category) {
+// Adjuntos normales: Documentos/<Proyecto>
+async function carpetaDocumentos(projectId) {
+  return gdrive.ensurePath([CARPETAS_RAIZ.task, await nombreProyecto(projectId)]);
+}
+
+// Evidencias SGC: la ruta sale de la taxonomía del catálogo, no del
+// proyecto, porque así se revisan en una auditoría.
+//
+//   SGC/<dimensión>/<criterio>/<código> — <nombre de la evidencia>
+//
+// Las carpetas que falten se crean solas, así que una dimensión, un
+// criterio o una evidencia nuevos aparecen sin tocar nada.
+async function carpetaSGC(evidencia, projectId) {
+  if (!evidencia) {
+    // Archivo de evidencia en una tarea sin evidencias vinculadas
+    return gdrive.ensurePath([CARPETAS_RAIZ.sgc, 'Sin clasificar', await nombreProyecto(projectId)]);
+  }
+
+  return gdrive.ensurePath([
+    CARPETAS_RAIZ.sgc,
+    nombreCarpeta(evidencia.dimension),
+    nombreCarpeta(evidencia.criterio),
+    nombreCarpeta(`${evidencia.evidencia} — ${evidencia.nombre_evidencia}`),
+  ]);
+}
+
+async function guardarAdjunto(req, category, evidencia = null) {
   const file = req.file;
   let storage = 'local';
   let externalId = null;
@@ -480,7 +524,10 @@ async function guardarAdjunto(req, category) {
 
   // Con Drive activo multer entrega el archivo en memoria, no en disco
   if (gdrive.isEnabled() && file.buffer) {
-    const parentId = await carpetaDelProyecto(req.params.project_id);
+    const parentId = category === 'sgc'
+      ? await carpetaSGC(evidencia, req.params.project_id)
+      : await carpetaDocumentos(req.params.project_id);
+
     const subido = await gdrive.uploadFile({
       name:     file.originalname,
       mimeType: file.mimetype,
@@ -494,10 +541,10 @@ async function guardarAdjunto(req, category) {
 
   const [result] = await db.query(
     `INSERT INTO task_attachments
-       (task_id, user_id, filename, filepath, filesize, mimetype, category, storage_provider, external_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (task_id, user_id, filename, filepath, filesize, mimetype, category, storage_provider, external_id, evidencia_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [req.params.id, req.user.id, file.originalname, filepath,
-     file.size, file.mimetype, category, storage, externalId]
+     file.size, file.mimetype, category, storage, externalId, evidencia?.id || null]
   );
 
   return {
@@ -509,6 +556,9 @@ async function guardarAdjunto(req, category) {
     category,
     storage_provider: storage,
     external_id:      externalId,
+    evidencia_id:     evidencia?.id || null,
+    evidencia_codigo: evidencia?.evidencia || null,
+    nombre_evidencia: evidencia?.nombre_evidencia || null,
   };
 }
 
@@ -556,10 +606,36 @@ exports.deleteAttachment = async (req, res) => {
   }
 };
 
+// Un archivo de evidencia se guarda en la carpeta de cada evidencia
+// vinculada a la tarea, así que puede generar varias copias.
+// Responde siempre con un arreglo.
 exports.uploadSGCAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });
-    res.status(201).json(await guardarAdjunto(req, 'sgc'));
+
+    const [evidencias] = await db.query(
+      `SELECT e.* FROM sgc_evidencias e
+         JOIN task_sgc ts ON ts.evidencia_id = e.id
+        WHERE ts.task_id = ?
+        ORDER BY e.evidencia`,
+      [req.params.id]
+    );
+
+    // Sin Drive el archivo está una sola vez en disco: duplicar registros
+    // dejaría varias filas apuntando al mismo archivo, y borrar una
+    // rompería las demás. En ese caso se guarda una sola.
+    if (!gdrive.isEnabled() || evidencias.length === 0) {
+      return res.status(201).json([await guardarAdjunto(req, 'sgc', evidencias[0] || null)]);
+    }
+
+    // En serie, no en paralelo: dos subidas simultáneas podrían crear la
+    // misma carpeta dos veces.
+    const creados = [];
+    for (const evidencia of evidencias) {
+      creados.push(await guardarAdjunto(req, 'sgc', evidencia));
+    }
+
+    res.status(201).json(creados);
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al subir archivo SGC' });

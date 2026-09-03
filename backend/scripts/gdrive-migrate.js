@@ -33,23 +33,51 @@ function rutaLocal(a) {
   ].find(p => fs.existsSync(p)) || null;
 }
 
-async function carpetaDelProyecto(projectId, cache) {
-  if (cache.has(projectId)) return cache.get(projectId);
+// Misma estructura que usa el backend: Documentos/<Proyecto> para los
+// adjuntos, y SGC/<Dimensión>/<Criterio>/<Evidencia> para las evidencias.
+const CARPETAS_RAIZ = {
+  task: process.env.GDRIVE_FOLDER_DOCUMENTOS || 'Documentos',
+  sgc:  process.env.GDRIVE_FOLDER_SGC        || 'SGC',
+};
 
-  const [[proyecto]] = await db.query(
-    'SELECT name, gdrive_folder_id FROM projects WHERE id = ?', [projectId]
-  );
+const nombreCarpeta = (texto, max = 120) =>
+  String(texto).replace(/[/\\]/g, '-').replace(/\s+/g, ' ').trim().slice(0, max) || 'Sin nombre';
+
+async function nombreProyecto(projectId) {
+  const [[proyecto]] = await db.query('SELECT name FROM projects WHERE id = ?', [projectId]);
   if (!proyecto) throw new Error(`Proyecto ${projectId} no encontrado`);
+  return `${nombreCarpeta(proyecto.name)} (#${projectId})`;
+}
 
-  let folderId = proyecto.gdrive_folder_id;
-  if (!folderId) {
-    folderId = await gdrive.ensureFolder(`${proyecto.name} (#${projectId})`);
-    await db.query('UPDATE projects SET gdrive_folder_id = ? WHERE id = ?', [folderId, projectId]);
+// Los adjuntos que ya existen no tienen evidencia asignada, así que las
+// evidencias viejas caen en "Sin clasificar" hasta que se reorganicen.
+async function carpetaDestino(adjunto) {
+  if (adjunto.category !== 'sgc') {
+    return gdrive.ensurePath([CARPETAS_RAIZ.task, await nombreProyecto(adjunto.project_id)]);
   }
 
-  cache.set(projectId, folderId);
-  return folderId;
+  if (!adjunto.evidencia_id) {
+    return gdrive.ensurePath([CARPETAS_RAIZ.sgc, 'Sin clasificar', await nombreProyecto(adjunto.project_id)]);
+  }
+
+  const [[e]] = await db.query('SELECT * FROM sgc_evidencias WHERE id = ?', [adjunto.evidencia_id]);
+  if (!e) {
+    return gdrive.ensurePath([CARPETAS_RAIZ.sgc, 'Sin clasificar', await nombreProyecto(adjunto.project_id)]);
+  }
+
+  return gdrive.ensurePath([
+    CARPETAS_RAIZ.sgc,
+    nombreCarpeta(e.dimension),
+    nombreCarpeta(e.criterio),
+    nombreCarpeta(`${e.evidencia} — ${e.nombre_evidencia}`),
+  ]);
 }
+
+// Etiqueta de la ruta, para el modo simulación
+const rutaLegible = (a) =>
+  a.category === 'sgc'
+    ? (a.evidencia_id ? `${CARPETAS_RAIZ.sgc}/…/evidencia` : `${CARPETAS_RAIZ.sgc}/Sin clasificar`)
+    : `${CARPETAS_RAIZ.task}`;
 
 async function main() {
   if (!gdrive.isEnabled()) {
@@ -78,7 +106,6 @@ async function main() {
 
   console.log(`${pendientes.length} adjunto(s) por migrar\n`);
 
-  const cache = new Map();
   let migrados = 0, ausentes = 0, fallidos = 0;
 
   for (const adjunto of pendientes) {
@@ -92,13 +119,13 @@ async function main() {
     }
 
     if (!APLICAR) {
-      console.log(`  · ${etiqueta} — se subiría al proyecto ${adjunto.project_id}`);
+      console.log(`  · ${etiqueta} — iría a ${rutaLegible(adjunto)}/ (proyecto ${adjunto.project_id})`);
       migrados++;
       continue;
     }
 
     try {
-      const parentId = await carpetaDelProyecto(adjunto.project_id, cache);
+      const parentId = await carpetaDestino(adjunto);
       const subido = await gdrive.uploadFile({
         name:     adjunto.filename,
         mimeType: adjunto.mimetype,

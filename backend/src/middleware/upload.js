@@ -11,19 +11,48 @@ const sgcDir   = path.join(baseDir, 'sgc');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Tipos de archivo aceptados.
+//
+// Se valida por mimetype y, si no coincide, por extensión: el mimetype lo
+// declara el navegador según el registro del sistema operativo, y Windows
+// manda cosas inesperadas — 'application/octet-stream' para archivos de
+// texto, 'application/x-zip-compressed' para los .zip. Validar solo por
+// mimetype rechazaba archivos perfectamente válidos.
+const MIMES_PERMITIDOS = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'text/markdown', 'application/rtf', 'text/rtf',
+  'application/zip', 'application/x-zip-compressed', 'multipart/x-zip',
+];
+
+const EXTENSIONES_PERMITIDAS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp',
+  '.pdf',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt', '.csv', '.md', '.rtf',
+  '.zip',
+];
+
 const fileFilter = (req, file, cb) => {
-  const allowed = [
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain', 'text/csv',
-    'application/zip',
-  ];
-  if (allowed.includes(file.mimetype)) cb(null, true);
-  else cb(new Error('Tipo de archivo no permitido'), false);
+  const extension = path.extname(file.originalname).toLowerCase();
+
+  if (MIMES_PERMITIDOS.includes(file.mimetype) || EXTENSIONES_PERMITIDAS.includes(extension)) {
+    return cb(null, true);
+  }
+
+  // Mensaje que sí llega al usuario: dice qué se rechazó y qué se acepta
+  const error = new Error(
+    `No se permite este tipo de archivo (${extension || file.mimetype}). ` +
+    `Formatos aceptados: ${EXTENSIONES_PERMITIDAS.join(', ')}`
+  );
+  error.status = 400;
+  cb(error, false);
 };
 
 const limits = { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024 };
@@ -45,4 +74,4 @@ const almacenamiento = (dest) =>
 const uploadTask = multer({ storage: almacenamiento(tasksDir), fileFilter, limits });
 const uploadSGC  = multer({ storage: almacenamiento(sgcDir),   fileFilter, limits });
 
-module.exports = { uploadTask, uploadSGC };
+module.exports = { uploadTask, uploadSGC, EXTENSIONES_PERMITIDAS };

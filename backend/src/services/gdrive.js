@@ -118,6 +118,35 @@ async function ensureFolder(nombre, parentId = DRIVE_ID) {
   return (await buscarCarpeta(nombre, parentId)) || crearCarpeta(nombre, parentId);
 }
 
+// Los ids de carpeta no cambian, así que se recuerdan mientras viva el
+// proceso: solo la primera subida de cada proyecto consulta a Drive.
+const cacheCarpetas = new Map();
+
+/**
+ * Recorre una ruta de carpetas desde la raíz de la unidad, creando las
+ * que falten, y devuelve el id de la última.
+ *
+ *   ensurePath(['SGC', 'Alumni (#3)'])  →  id de "Alumni (#3)" dentro de SGC
+ */
+async function ensurePath(nombres) {
+  let parentId = DRIVE_ID;
+  let clave = '';
+
+  for (const nombre of nombres) {
+    clave += `/${nombre}`;
+
+    if (cacheCarpetas.has(clave)) {
+      parentId = cacheCarpetas.get(clave);
+      continue;
+    }
+
+    parentId = await ensureFolder(nombre, parentId);
+    cacheCarpetas.set(clave, parentId);
+  }
+
+  return parentId;
+}
+
 // ── Archivos ─────────────────────────────────────────────────────────────
 
 /**
@@ -174,6 +203,7 @@ async function checkConnection() {
 module.exports = {
   isEnabled,
   ensureFolder,
+  ensurePath,
   uploadFile,
   getFileResponse,
   deleteFile,
