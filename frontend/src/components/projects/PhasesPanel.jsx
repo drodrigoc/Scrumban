@@ -19,6 +19,13 @@ const PLANTILLA = [
 
 const emptyForm = { name: '', description: '', start_date: '', end_date: '', color: PHASE_COLORS[0] };
 
+// Escalas del cronograma. Las dos dibujan 12 columnas: cambia la unidad.
+const ESCALAS = [
+  { value: 'mes',       label: 'Anual · 12 meses',        descripcion: '12 meses' },
+  { value: 'trimestre', label: '3 años · 12 trimestres',  descripcion: '12 trimestres (3 años)' },
+];
+const ESCALA_STORAGE_KEY = (projectId) => `phases_scale_${projectId}`;
+
 export default function PhasesPanel({ projectId, canEdit, projectStart, projectEnd, onChange }) {
   const [phases, setPhases]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +33,16 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
   const [showForm, setShowForm]   = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+
+  // Preferencia de vista personal, igual que la ventana del Kanban
+  const [escala, setEscala] = useState(() => {
+    const guardada = localStorage.getItem(ESCALA_STORAGE_KEY(projectId));
+    return ESCALAS.some(e => e.value === guardada) ? guardada : 'mes';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(ESCALA_STORAGE_KEY(projectId), escala);
+  }, [escala, projectId]);
 
   const load = async () => {
     try {
@@ -136,6 +153,10 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
     </div>
   );
 
+  const escalaActual = ESCALAS.find(e => e.value === escala) ?? ESCALAS[0];
+  // El mismo cálculo que dibuja la barra, para anunciar el periodo exacto
+  const ventana = calcularVentana(phases, projectStart, 12, escala);
+
   return (
     <div className="card p-5 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -149,23 +170,39 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
           </p>
           {phases.length > 0 && (
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              12 meses desde el inicio del proyecto ·{' '}
-              <span className="capitalize">{calcularVentana(phases, projectStart, 12).etiqueta}</span>
+              {escalaActual.descripcion} desde el inicio del proyecto ·{' '}
+              <span className="capitalize">{ventana.etiqueta}</span>
             </p>
           )}
         </div>
-        {canEdit && !showForm && (
-          <div className="flex gap-2">
-            {phases.length === 0 && (
-              <button onClick={handleUsarPlantilla} disabled={saving} className="btn-secondary text-xs py-1.5 px-3">
-                <Sparkles className="w-3.5 h-3.5" /> Usar plantilla
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {phases.length > 0 && (
+            <select
+              value={escala}
+              onChange={e => setEscala(e.target.value)}
+              title="Escala del cronograma"
+              className="input py-1.5 w-auto text-xs"
+            >
+              {ESCALAS.map(e => (
+                <option key={e.value} value={e.value}>{e.label}</option>
+              ))}
+            </select>
+          )}
+
+          {canEdit && !showForm && (
+            <>
+              {phases.length === 0 && (
+                <button onClick={handleUsarPlantilla} disabled={saving} className="btn-secondary text-xs py-1.5 px-3">
+                  <Sparkles className="w-3.5 h-3.5" /> Usar plantilla
+                </button>
+              )}
+              <button onClick={openNew} className="btn-secondary text-xs py-1.5 px-3">
+                <Plus className="w-3.5 h-3.5" /> Nueva fase
               </button>
-            )}
-            <button onClick={openNew} className="btn-secondary text-xs py-1.5 px-3">
-              <Plus className="w-3.5 h-3.5" /> Nueva fase
-            </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Formulario */}
@@ -255,7 +292,8 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
               <PhasesTimeline
                 phases={phases}
                 anchorDate={projectStart}
-                monthsCount={12}
+                unitCount={12}
+                unit={escala}
                 showHeader
                 showDates
                 canEdit={canEdit}

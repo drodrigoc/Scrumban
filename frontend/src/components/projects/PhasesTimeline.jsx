@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import {
   parseISO, differenceInDays, isBefore, isAfter,
-  startOfMonth, endOfMonth, eachMonthOfInterval, addMonths, format,
+  startOfMonth, endOfMonth, eachMonthOfInterval, addMonths,
+  startOfQuarter, endOfQuarter, eachQuarterOfInterval, addQuarters, getQuarter,
+  format,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -22,13 +24,39 @@ const parseFecha = (valor) => {
 const fmtCorto = (d) => (d ? format(parseFecha(d), 'd MMM', { locale: es }) : '—');
 const fmtLargo = (d) => (d ? format(parseFecha(d), "d 'de' MMMM yyyy", { locale: es }) : 'sin fecha');
 
+// Unidades de escala disponibles. Con 12 columnas en ambas, la vista
+// cubre un año en meses o tres años en trimestres.
+const UNIDADES = {
+  mes: {
+    inicio: startOfMonth,
+    fin:    endOfMonth,
+    sumar:  addMonths,
+    cada:   eachMonthOfInterval,
+    // El año se escribe en la primera columna y cada vez que cambia
+    etiqueta: (d, i) => (i === 0 || d.getMonth() === 0)
+      ? format(d, 'MMM yy', { locale: es })
+      : format(d, 'MMM', { locale: es }),
+  },
+  trimestre: {
+    inicio: startOfQuarter,
+    fin:    endOfQuarter,
+    sumar:  addQuarters,
+    cada:   eachQuarterOfInterval,
+    etiqueta: (d, i) => (i === 0 || getQuarter(d) === 1)
+      ? `T${getQuarter(d)} ${format(d, 'yy', { locale: es })}`
+      : `T${getQuarter(d)}`,
+  },
+};
+
 /**
  * Ventana de tiempo que se dibuja cuando el componente calcula su propia
- * escala: `monthsCount` meses corridos a partir del mes de inicio del
- * proyecto. Se exporta para que quien la muestre (la ficha del proyecto)
- * anuncie exactamente el mismo periodo que se está dibujando.
+ * escala: `unitCount` meses (o trimestres) corridos a partir del inicio
+ * del proyecto. Se exporta para que quien la muestre (la ficha del
+ * proyecto) anuncie exactamente el mismo periodo que se está dibujando.
  */
-export function calcularVentana(phases = [], anchorDate = null, monthsCount = 12) {
+export function calcularVentana(phases = [], anchorDate = null, unitCount = 12, unit = 'mes') {
+  const u = UNIDADES[unit] ?? UNIDADES.mes;
+
   const fechas = phases
     .flatMap(p => [p.start_date || null, p.end_date || null])
     .filter(Boolean)
@@ -37,12 +65,13 @@ export function calcularVentana(phases = [], anchorDate = null, monthsCount = 12
   const ancla = parseFecha(anchorDate)
     ?? (fechas.length ? new Date(Math.min(...fechas)) : new Date());
 
-  const start = startOfMonth(ancla);
-  const end   = endOfMonth(addMonths(start, monthsCount - 1));
+  const start = u.inicio(ancla);
+  const end   = u.fin(u.sumar(start, unitCount - 1));
 
   return {
     start,
     end,
+    ticks: u.cada({ start, end }).map(u.etiqueta),
     etiqueta: `${format(start, 'MMM yyyy', { locale: es })} → ${format(end, 'MMM yyyy', { locale: es })}`,
   };
 }
@@ -58,14 +87,15 @@ export function calcularVentana(phases = [], anchorDate = null, monthsCount = 12
  */
 export default function PhasesTimeline({
   phases,
-  rangeStart  = null,
-  rangeEnd    = null,
-  gridCount   = null,
-  anchorDate  = null,
-  monthsCount = 12,
-  showHeader  = false,
-  showDates   = false,
-  canEdit     = false,
+  rangeStart = null,
+  rangeEnd   = null,
+  gridCount  = null,
+  anchorDate = null,
+  unitCount  = 12,
+  unit       = 'mes',
+  showHeader = false,
+  showDates  = false,
+  canEdit    = false,
   onEdit,
   onDelete,
 }) {
@@ -75,21 +105,10 @@ export default function PhasesTimeline({
     // Escala impuesta por el padre (vista Cronograma)
     if (rangeStart && rangeEnd) return { start: rangeStart, end: rangeEnd, ticks: [] };
 
-    // La ventana arranca en el mes de inicio del proyecto. Sin esa fecha,
-    // en el mes de la fase más temprana; y sin fases, en el mes actual.
-    const { start: desde, end: hasta } = calcularVentana(phases, anchorDate, monthsCount);
-
-    return {
-      start: desde,
-      end:   hasta,
-      // El año solo se escribe en el primer mes y cada vez que cambia
-      ticks: eachMonthOfInterval({ start: desde, end: hasta }).map((m, i) =>
-        (i === 0 || m.getMonth() === 0)
-          ? format(m, 'MMM yy', { locale: es })
-          : format(m, 'MMM',    { locale: es })
-      ),
-    };
-  }, [phases, rangeStart, rangeEnd, anchorDate, monthsCount]);
+    // La ventana arranca en el inicio del proyecto. Sin esa fecha, en la
+    // fase más temprana; y sin fases, en la fecha de hoy.
+    return calcularVentana(phases, anchorDate, unitCount, unit);
+  }, [phases, rangeStart, rangeEnd, anchorDate, unitCount, unit]);
 
   const totalDays = start && end ? Math.max(1, differenceInDays(end, start)) : 0;
   const columnas  = Math.max(gridCount ?? ticks.length, 1);
