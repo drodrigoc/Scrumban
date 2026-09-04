@@ -176,6 +176,9 @@ function GestionTab({ evidencias, setEvidencias }) {
       );
       setEditingId(null);
       toast.success('Evidencia actualizada');
+
+      // La carpeta de Drive sigue al cambio; si no se pudo, hay que avisar
+      if (data.drive_aviso) toast.warning(data.drive_aviso, { autoClose: 8000 });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al actualizar');
     } finally {

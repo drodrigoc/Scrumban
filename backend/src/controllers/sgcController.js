@@ -1,5 +1,56 @@
 const logger = require('../config/logger');
 const db     = require('../config/database');
+const gdrive = require('../services/gdrive');
+
+// Mismos nombres y saneado que usa el controlador de tareas al guardar
+const RAIZ_SGC = process.env.GDRIVE_FOLDER_SGC || 'SGC';
+
+const nombreCarpeta = (texto, max = 120) =>
+  String(texto).replace(/[/\\]/g, '-').replace(/\s+/g, ' ').trim().slice(0, max) || 'Sin nombre';
+
+const rutaEvidencia = (e) => [
+  RAIZ_SGC,
+  nombreCarpeta(e.dimension),
+  nombreCarpeta(e.criterio),
+  nombreCarpeta(`${e.evidencia} — ${e.nombre_evidencia}`),
+];
+
+/**
+ * Hace que la carpeta de Drive siga el cambio del catálogo: la renombra
+ * si cambió el código o el nombre, y la mueve si cambió la dimensión o el
+ * criterio, creando las carpetas nuevas que hagan falta.
+ *
+ * Devuelve un aviso si no se pudo, en vez de lanzar: editar el catálogo
+ * no debe fallar porque Drive tenga un problema, pero el administrador
+ * tiene que enterarse de que quedaron desalineados.
+ */
+async function moverCarpetaEvidencia(anterior, nueva) {
+  if (!gdrive.isEnabled()) return null;
+
+  const rutaVieja = rutaEvidencia(anterior);
+  const rutaNueva = rutaEvidencia(nueva);
+  if (rutaVieja.join('/') === rutaNueva.join('/')) return null;
+
+  try {
+    // Sin carpeta previa no hay nada que mover: nunca se subió una evidencia
+    const carpetaId = await gdrive.findPath(rutaVieja);
+    if (!carpetaId) return null;
+
+    const nuevoPadre = await gdrive.ensurePath(rutaNueva.slice(0, -1));
+    await gdrive.renameFolder(carpetaId, rutaNueva.at(-1), nuevoPadre);
+
+    logger.info('Carpeta de evidencia reubicada en Drive', {
+      de: rutaVieja.join('/'), a: rutaNueva.join('/'),
+    });
+    return null;
+  } catch (error) {
+    logger.error('No se pudo reubicar la carpeta de la evidencia en Drive', {
+      message: error.message, de: rutaVieja.join('/'), a: rutaNueva.join('/'),
+    });
+    return 'La evidencia se actualizó, pero su carpeta en Google Drive conservó el nombre anterior. ' +
+           'Revísala manualmente en la unidad compartida.';
+  }
+}
 
 // GET /api/sgc
 exports.getAll = async (req, res) => {
@@ -89,7 +140,8 @@ exports.update = async (req, res) => {
     if (!dimension?.trim() || !criterio?.trim() || !evidencia?.trim() || !nombre_evidencia?.trim()) {
       return res.status(400).json({ message: 'Dimensión, criterio, evidencia y nombre son requeridos' });
     }
-    const [existing] = await db.query('SELECT id FROM sgc_evidencias WHERE id = ?', [id]);
+    // Se conserva el estado anterior para saber si la carpeta debe moverse
+    const [existing] = await db.query('SELECT * FROM sgc_evidencias WHERE id = ?', [id]);
     if (!existing.length) return res.status(404).json({ message: 'Evidencia no encontrada' });
 
     await db.query(
@@ -97,7 +149,9 @@ exports.update = async (req, res) => {
       [dimension.trim(), criterio.trim(), evidencia.trim(), nombre_evidencia.trim(), descripcion?.trim() || null, id]
     );
     const [rows] = await db.query('SELECT * FROM sgc_evidencias WHERE id = ?', [id]);
-    res.json(rows[0]);
+
+    const aviso = await moverCarpetaEvidencia(existing[0], rows[0]);
+    res.json(aviso ? { ...rows[0], drive_aviso: aviso } : rows[0]);
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: `La evidencia "${req.body.evidencia}" ya existe` });

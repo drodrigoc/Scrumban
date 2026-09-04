@@ -147,6 +147,52 @@ async function ensurePath(nombres) {
   return parentId;
 }
 
+/**
+ * Igual que ensurePath pero sin crear nada: devuelve null si algún tramo
+ * de la ruta no existe. Sirve para localizar la carpeta de una evidencia
+ * antes de renombrarla, sin crearla por accidente si nunca se usó.
+ */
+async function findPath(nombres) {
+  let parentId = DRIVE_ID;
+
+  for (const nombre of nombres) {
+    parentId = await buscarCarpeta(nombre, parentId);
+    if (!parentId) return null;
+  }
+
+  return parentId;
+}
+
+/**
+ * Renombra una carpeta y, si se indica, la cuelga de otro padre.
+ * Se usa cuando cambia la dimensión, el criterio o el nombre de una
+ * evidencia y su carpeta tiene que seguir el cambio.
+ */
+async function renameFolder(folderId, nuevoNombre, nuevoParentId = null) {
+  const params = new URLSearchParams({ supportsAllDrives: 'true', fields: 'id,name,parents' });
+
+  if (nuevoParentId) {
+    const actual = await apiJson(`${API}/files/${folderId}?fields=parents&supportsAllDrives=true`);
+    const padres = actual.parents || [];
+
+    // Si ya cuelga de ese padre solo hay que renombrarla
+    if (!padres.includes(nuevoParentId)) {
+      params.set('addParents', nuevoParentId);
+      if (padres.length) params.set('removeParents', padres.join(','));
+    }
+  }
+
+  const resultado = await apiJson(`${API}/files/${folderId}?${params}`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ name: nuevoNombre }),
+  });
+
+  // Las rutas memorizadas dejaron de ser válidas tras mover carpetas
+  cacheCarpetas.clear();
+  return resultado;
+}
+
 // ── Archivos ─────────────────────────────────────────────────────────────
 
 /**
@@ -242,6 +288,8 @@ module.exports = {
   isEnabled,
   ensureFolder,
   ensurePath,
+  findPath,
+  renameFolder,
   uploadFile,
   getFileResponse,
   deleteFile,
