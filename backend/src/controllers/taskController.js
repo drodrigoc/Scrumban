@@ -1,14 +1,6 @@
 ﻿const logger = require('../config/logger');
 const db = require('../config/database');
-
-async function createNotification(userId, title, message, type, refId, refType) {
-  try {
-    await db.query(
-      'INSERT INTO notifications (user_id, title, message, type, reference_id, reference_type) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, title, message, type, refId, refType]
-    );
-  } catch (_) {}
-}
+const notificaciones = require('../services/notificaciones');
 
 async function logHistory(taskId, userId, field, oldVal, newVal) {
   try {
@@ -188,11 +180,8 @@ exports.create = async (req, res) => {
       await db.query('INSERT INTO task_sgc (task_id, evidencia_id) VALUES ?', [sgcValues]);
     }
 
-    if (assignee_id && assignee_id !== req.user.id) {
-      await createNotification(assignee_id, 'Nueva tarea asignada', `Se te asignó la tarea "${title}"`, 'task_assigned', taskId, 'task');
-    }
-
     await logHistory(taskId, req.user.id, 'created', null, 'Tarea creada');
+    await notificaciones.tareaAsignada({ taskId, assigneeId: assignee_id, actor: req.user });
 
     const [tasks] = await db.query('SELECT * FROM tasks WHERE id = ?', [taskId]);
     res.status(201).json(tasks[0]);
@@ -214,6 +203,9 @@ exports.update = async (req, res) => {
     const fields = [];
     const values = [];
     const changes = [];
+    // Las notificaciones se disparan después de guardar, para que lean
+    // la tarea ya actualizada
+    const eventos = [];
 
     if (title && title !== task.title) {
       fields.push('title = ?'); values.push(title);
@@ -221,12 +213,18 @@ exports.update = async (req, res) => {
     }
     if (description !== undefined) { fields.push('description = ?'); values.push(description); }
     if (assignee_id !== undefined) {
-      fields.push('assignee_id = ?'); values.push(assignee_id || null);
-      if (assignee_id && assignee_id !== task.assignee_id) {
-        changes.push({ field: 'assignee', old: task.assignee_id, new: assignee_id });
-        if (assignee_id !== req.user.id) {
-          await createNotification(assignee_id, 'Tarea asignada', `Se te asignó la tarea "${task.title}"`, 'task_assigned', id, 'task');
-        }
+      // El formulario manda el id como texto ("5"); compararlo sin convertir
+      // hacía que cada guardado se tomara como una reasignación y volviera
+      // a notificar al responsable aunque no hubiera cambiado
+      const nuevoResponsable = assignee_id ? Number(assignee_id) : null;
+      fields.push('assignee_id = ?'); values.push(nuevoResponsable);
+
+      if (nuevoResponsable !== task.assignee_id) {
+        changes.push({ field: 'assignee', old: task.assignee_id, new: nuevoResponsable });
+        eventos.push(() => notificaciones.tareaAsignada({ taskId: id, assigneeId: nuevoResponsable, actor: req.user }));
+        eventos.push(() => notificaciones.tareaReasignada({
+          taskId: id, anteriorId: task.assignee_id, nuevoId: nuevoResponsable, actor: req.user,
+        }));
       }
     }
     if (start_date !== undefined) { fields.push('start_date = ?'); values.push(start_date || null); }
@@ -244,9 +242,9 @@ exports.update = async (req, res) => {
         fields.push('completed_at = ?', 'archived_at = ?'); values.push(null, null);
       }
 
-      if (task.assignee_id && task.assignee_id !== req.user.id) {
-        await createNotification(task.assignee_id, 'Estado de tarea actualizado', `La tarea "${task.title}" cambió a ${status}`, 'status_changed', id, 'task');
-      }
+      eventos.push(() => notificaciones.cambioEstado({
+        taskId: id, anterior: task.status, nuevo: status, actor: req.user,
+      }));
     }
     if (position !== undefined) { fields.push('position = ?'); values.push(position); }
     if (progress !== undefined) { fields.push('progress = ?'); values.push(progress); }
@@ -285,6 +283,8 @@ exports.update = async (req, res) => {
     for (const change of changes) {
       await logHistory(id, req.user.id, change.field, change.old, change.new);
     }
+
+    for (const evento of eventos) await evento();
 
     const [updated] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
     const [taskLabels] = await db.query(
@@ -404,15 +404,7 @@ exports.addComment = async (req, res) => {
       [id, req.user.id, content.trim()]
     );
 
-    const [task] = await db.query('SELECT title, assignee_id FROM tasks WHERE id = ?', [id]);
-    if (task[0]?.assignee_id && task[0].assignee_id !== req.user.id) {
-      await createNotification(
-        task[0].assignee_id,
-        'Nuevo comentario',
-        `${req.user.name} comentó en "${task[0].title}"`,
-        'comment_added', id, 'task'
-      );
-    }
+    await notificaciones.comentario({ taskId: id, actor: req.user, contenido: content.trim() });
 
     const [comment] = await db.query(`
       SELECT tc.*, u.name as user_name, u.avatar as user_avatar

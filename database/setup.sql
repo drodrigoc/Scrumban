@@ -46,6 +46,7 @@ CREATE TABLE users (
                       DEFAULT 'member',
   sgc_access          BOOLEAN             DEFAULT FALSE,
   is_active           BOOLEAN             DEFAULT TRUE,
+  email_notifications BOOLEAN             NOT NULL DEFAULT TRUE,
   reset_token         VARCHAR(255)        DEFAULT NULL,
   reset_token_expires DATETIME            DEFAULT NULL,
   created_at          TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
@@ -326,6 +327,40 @@ CREATE TABLE project_phases (
 
 ALTER TABLE tasks
   ADD CONSTRAINT fk_tasks_phase FOREIGN KEY (phase_id) REFERENCES project_phases(id) ON DELETE SET NULL;
+
+-- ------------------------------------------------------------
+-- 18a. Configuración editable desde la aplicación
+--      (cuenta de correo conectada, remitente, token cifrado)
+-- ------------------------------------------------------------
+CREATE TABLE system_settings (
+  setting_key   VARCHAR(100) PRIMARY KEY,
+  setting_value TEXT         DEFAULT NULL,
+  updated_by    INT          DEFAULT NULL,
+  updated_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- 18b. Cola de correos salientes (envío en segundo plano)
+-- ------------------------------------------------------------
+CREATE TABLE email_queue (
+  id          INT PRIMARY KEY AUTO_INCREMENT,
+  to_email    VARCHAR(255)  NOT NULL,
+  to_user_id  INT           DEFAULT NULL,
+  subject     VARCHAR(255)  NOT NULL,
+  html        MEDIUMTEXT    NOT NULL,
+  text_body   MEDIUMTEXT    DEFAULT NULL,
+  event_type  VARCHAR(50)   NOT NULL,
+  status      ENUM('pending','sending','sent','failed') NOT NULL DEFAULT 'pending',
+  attempts    INT           NOT NULL DEFAULT 0,
+  last_error  VARCHAR(1000) DEFAULT NULL,
+  send_after  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  sent_at     DATETIME      DEFAULT NULL,
+  created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_email_queue_pendientes ON email_queue(status, send_after);
 
 -- ------------------------------------------------------------
 -- 18. Índices de rendimiento

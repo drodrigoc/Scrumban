@@ -1,5 +1,6 @@
 ﻿const logger = require('../config/logger');
 const db = require('../config/database');
+const notificaciones = require('../services/notificaciones');
 
 exports.getAll = async (req, res) => {
   try {
@@ -194,7 +195,7 @@ exports.addMember = async (req, res) => {
       [id, user_id, role || 'member']
     );
 
-    await createNotification(user_id, 'Añadido a proyecto', `Has sido añadido a un proyecto`, 'project_update', id, 'project');
+    await notificaciones.agregadoProyecto({ projectId: id, userId: user_id, rol: role || 'member', actor: req.user });
 
     res.status(201).json({ message: 'Miembro agregado' });
   } catch (error) {
@@ -357,12 +358,3 @@ exports.saveColumns = async (req, res) => {
     conn.release();
   }
 };
-
-async function createNotification(userId, title, message, type, refId, refType) {
-  try {
-    await db.query(
-      'INSERT INTO notifications (user_id, title, message, type, reference_id, reference_type) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, title, message, type, refId, refType]
-    );
-  } catch (_) {}
-}

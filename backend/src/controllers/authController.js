@@ -3,6 +3,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../config/database');
+const email = require('../services/email');
+const { render, urlApp } = require('../services/plantillasCorreo');
+
+// En la base solo se guarda el hash del token de recuperación: si alguien
+// leyera la tabla, no podría usar los enlaces vigentes
+const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
@@ -94,26 +100,44 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const [users] = await db.query('SELECT id FROM users WHERE email = ?', [email?.toLowerCase().trim()]);
+    const respuesta = { message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña' };
 
-    // Siempre responder igual para no revelar si el email existe
-    if (!users.length) {
-      return res.json({ message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña' });
-    }
-
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
-
-    await db.query(
-      'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
-      [resetToken, expires, users[0].id]
+    const [users] = await db.query(
+      'SELECT id, name, email, is_active FROM users WHERE email = ?',
+      [email?.toLowerCase().trim()]
     );
 
-    // En producción enviar email; aquí solo devolvemos el token para desarrollo
-    res.json({
-      message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña',
-      ...(process.env.NODE_ENV === 'development' && { resetToken }),
-    });
+    // Siempre responder igual para no revelar si el email existe
+    if (!users.length || !users[0].is_active) return res.json(respuesta);
+
+    const usuario = users[0];
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // El vencimiento se calcula en MySQL, igual que la comparación al
+    // restablecer, para que no dependa de la zona horaria del servidor
+    await db.query(
+      'UPDATE users SET reset_token = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?',
+      [hashToken(resetToken), usuario.id]
+    );
+
+    let enviado = false;
+    try {
+      const { asunto, html, texto } = render('recuperarContrasena', {
+        nombre: usuario.name,
+        enlace: `${urlApp()}/forgot-password?token=${resetToken}`,
+      });
+      enviado = await email.encolar({ para: usuario.email, userId: usuario.id, asunto, html, texto, tipo: 'recuperarContrasena' });
+    } catch (error) {
+      logger.error('No se pudo encolar el correo de recuperación', { message: error.message });
+    }
+
+    // Sin cuenta de correo conectada, en desarrollo local el token se
+    // devuelve para poder probar el flujo. Nunca cuando el correo funciona.
+    if (!enviado && process.env.NODE_ENV === 'development') {
+      return res.json({ ...respuesta, resetToken });
+    }
+
+    res.json(respuesta);
   } catch (error) {
     logger.error('ForgotPassword error:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
@@ -130,7 +154,7 @@ exports.resetPassword = async (req, res) => {
 
     const [users] = await db.query(
       'SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
-      [token]
+      [hashToken(token)]
     );
 
     if (!users.length) {
@@ -147,5 +171,31 @@ exports.resetPassword = async (req, res) => {
   } catch (error) {
     logger.error('ResetPassword error:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/auth/preferences
+exports.getPreferences = async (req, res) => {
+  try {
+    const [[fila]] = await db.query('SELECT email_notifications FROM users WHERE id = ?', [req.user.id]);
+    res.json({ email_notifications: Boolean(fila?.email_notifications) });
+  } catch (error) {
+    logger.error('GetPreferences error:', error);
+    res.status(500).json({ message: 'No se pudieron cargar tus preferencias' });
+  }
+};
+
+// PUT /api/auth/preferences  { email_notifications }
+exports.updatePreferences = async (req, res) => {
+  try {
+    const { email_notifications } = req.body;
+    if (typeof email_notifications !== 'boolean') {
+      return res.status(400).json({ message: 'email_notifications debe ser verdadero o falso' });
+    }
+    await db.query('UPDATE users SET email_notifications = ? WHERE id = ?', [email_notifications, req.user.id]);
+    res.json({ email_notifications });
+  } catch (error) {
+    logger.error('UpdatePreferences error:', error);
+    res.status(500).json({ message: 'No se pudieron guardar tus preferencias' });
   }
 };

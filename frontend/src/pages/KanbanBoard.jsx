@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import {
@@ -749,6 +749,16 @@ export default function KanbanBoard() {
       setShowTaskModal(true);
     } catch { toast.error('Error al cargar tarea'); }
   };
+
+  // Los enlaces de los correos llegan con ?tarea=ID: se abre esa tarea
+  // en cuanto termina de cargar el tablero, y se limpia la URL
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const tareaId = parseInt(searchParams.get('tarea'), 10);
+    if (loading || !tareaId) return;
+    handleTaskClick({ id: tareaId });
+    setSearchParams({}, { replace: true });
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTaskSave = async (data) => {
     try {

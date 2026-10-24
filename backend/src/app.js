@@ -43,6 +43,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/sgc',       require('./routes/sgc'));
 app.use('/api/my-tasks',  require('./routes/myTasks'));
+app.use('/api/settings',  require('./routes/settings'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -84,6 +85,9 @@ app.listen(PORT, HOST, () => {
     red:   `http://${process.env.SERVER_IP || '10.10.25.10'}:${PORT}`,
     mode:  process.env.NODE_ENV || 'development',
   });
+
+  // Envío de correos de notificación en segundo plano
+  require('./services/email').iniciarProceso();
 
   // Dónde van a parar los adjuntos, visible desde el arranque
   const gdrive = require('./services/gdrive');

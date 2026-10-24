@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, CheckCheck, Sun, Moon, KeyRound, LogOut, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { Menu, Bell, CheckCheck, Sun, Moon, KeyRound, LogOut, Eye, EyeOff, ChevronDown, Mail } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { notificationsAPI, authAPI } from '../../services/api';
@@ -20,6 +20,28 @@ export default function Header({ onMenuClick }) {
 
   const [showUserMenu, setShowUserMenu]   = useState(false);
   const [showPassModal, setShowPassModal] = useState(false);
+  // null = todavía no se cargó (o falta la migración del servidor)
+  const [recibeCorreos, setRecibeCorreos] = useState(null);
+
+  // La preferencia se consulta al abrir el menú, no en cada página
+  useEffect(() => {
+    if (!showUserMenu || recibeCorreos !== null) return;
+    authAPI.getPreferences()
+      .then(({ data }) => setRecibeCorreos(data.email_notifications))
+      .catch(() => { /* sin preferencia disponible: el interruptor no se muestra */ });
+  }, [showUserMenu, recibeCorreos]);
+
+  const alternarCorreos = async () => {
+    const nuevo = !recibeCorreos;
+    setRecibeCorreos(nuevo);
+    try {
+      await authAPI.updatePreferences({ email_notifications: nuevo });
+      toast.success(nuevo ? 'Recibirás notificaciones por correo' : 'Ya no recibirás notificaciones por correo');
+    } catch {
+      setRecibeCorreos(!nuevo);
+      toast.error('No se pudo guardar tu preferencia');
+    }
+  };
 
   const notifRef    = useRef(null);
   const userMenuRef = useRef(null);
@@ -201,6 +223,20 @@ export default function Header({ onMenuClick }) {
                     <KeyRound className="w-4 h-4 text-gray-400" />
                     Cambiar contraseña
                   </button>
+                  {recibeCorreos !== null && (
+                    <button
+                      onClick={alternarCorreos}
+                      role="switch"
+                      aria-checked={recibeCorreos}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
+                    >
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <span className="flex-1 text-left">Avisos por correo</span>
+                      <span className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full transition-colors ${recibeCorreos ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${recibeCorreos ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-100 dark:border-gray-700 py-1">

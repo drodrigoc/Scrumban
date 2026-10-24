@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, FolderKanban, Users, LogOut, X, UsersRound, Building2, Landmark, ShieldCheck, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Users, LogOut, X, UsersRound, Building2, Landmark, ShieldCheck, CheckSquare, Mail } from 'lucide-react';
 import logo from '../../assets/logousocompleto.png';
 
 const navItems = [
@@ -95,6 +95,10 @@ export default function Sidebar({ open, onClose }) {
               <NavLink to="/sgc" className={linkClass}>
                 <ShieldCheck className="w-4 h-4 flex-shrink-0" />
                 SGC
+              </NavLink>
+              <NavLink to="/settings/email" className={linkClass}>
+                <Mail className="w-4 h-4 flex-shrink-0" />
+                Correo del sistema
               </NavLink>
             </>
           )}

@@ -21,6 +21,7 @@ import UnitsAdmin from './pages/UnitsAdmin';
 import Users from './pages/Users';
 import SGCAdmin from './pages/SGCAdmin';
 import MyTasks from './pages/MyTasks';
+import EmailSettings from './pages/EmailSettings';
 import NotFound from './pages/NotFound';
 
 function PrivateRoute({ children, roles, allowSGC }) {
@@ -69,6 +70,11 @@ function AppRoutes() {
         <Route path="users" element={
           <PrivateRoute roles={['admin']}>
             <Users />
+          </PrivateRoute>
+        } />
+        <Route path="settings/email" element={
+          <PrivateRoute roles={['admin']}>
+            <EmailSettings />
           </PrivateRoute>
         } />
         <Route path="sgc" element={

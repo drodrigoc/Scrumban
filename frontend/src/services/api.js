@@ -44,6 +44,18 @@ export const authAPI = {
   changePassword: (data) => api.put('/auth/change-password', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data) => api.post('/auth/reset-password', data),
+  getPreferences: () => api.get('/auth/preferences'),
+  updatePreferences: (data) => api.put('/auth/preferences', data),
+};
+
+// Configuración del sistema (solo administradores)
+export const settingsAPI = {
+  getEmail:        ()     => api.get('/settings/email'),
+  updateEmail:     (data) => api.put('/settings/email', data),
+  connectEmail:    ()     => api.post('/settings/email/oauth/start'),
+  disconnectEmail: ()     => api.delete('/settings/email'),
+  testEmail:       (para) => api.post('/settings/email/test', { para }),
+  retryEmails:     ()     => api.post('/settings/email/retry'),
 };
 
 // Users
