@@ -375,12 +375,17 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
     }
   };
 
-  const sgcFiltered = sgcEvidencias.filter(e =>
-    e.evidencia.toLowerCase().includes(sgcSearch.toLowerCase()) ||
-    e.nombre_evidencia.toLowerCase().includes(sgcSearch.toLowerCase()) ||
-    e.dimension.toLowerCase().includes(sgcSearch.toLowerCase()) ||
-    e.criterio.toLowerCase().includes(sgcSearch.toLowerCase())
-  );
+  // Busca en los cuatro niveles: código o nombre de la evidencia, de su
+  // indicador, de su criterio o de su dimensión
+  const sgcFiltered = sgcEvidencias.filter(e => {
+    const q = sgcSearch.toLowerCase();
+    return [
+      e.evidencia, e.nombre_evidencia,
+      e.indicador, e.indicador_nombre,
+      e.criterio, e.criterio_nombre,
+      e.dimension, e.dimension_nombre,
+    ].some(v => String(v || '').toLowerCase().includes(q));
+  });
 
   const toggleLabel = (labelId) => {
     setForm(prev => ({
@@ -778,10 +783,12 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                       onClick={() => { toggleSgc(e.id); setSgcSearch(''); setSgcOpen(false); }}
                       className={`w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${linked ? 'bg-primary-50 dark:bg-primary-900/30' : ''}`}
                     >
-                      <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400 w-14 flex-shrink-0">{e.evidencia}</span>
+                      <span className="font-mono text-xs font-bold text-primary-600 dark:text-primary-400 w-16 flex-shrink-0">{e.evidencia}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{e.nombre_evidencia}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{e.dimension} · {e.criterio}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                          {e.indicador ? `Indicador ${e.indicador} — ${e.indicador_nombre}` : 'Sin indicador'}
+                        </p>
                       </div>
                       {linked && <Check className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />}
                     </button>

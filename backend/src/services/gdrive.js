@@ -261,6 +261,12 @@ async function deleteFile(fileId) {
   throw new Error(`Drive rechazó eliminar el archivo (${borrado.status}). ${detalle}`);
 }
 
+// Carpeta(s) que contienen hoy un archivo o carpeta
+async function getParents(fileId) {
+  const data = await apiJson(`${API}/files/${fileId}?fields=parents&supportsAllDrives=true`);
+  return data.parents || [];
+}
+
 /**
  * Mueve un archivo a otra carpeta de la unidad. Drive no tiene "mover":
  * se cambia de padre, así que primero hay que saber cuál tiene.
@@ -294,6 +300,7 @@ module.exports = {
   getFileResponse,
   deleteFile,
   moveFile,
+  getParents,
   checkConnection,
   DRIVE_ID,
 };

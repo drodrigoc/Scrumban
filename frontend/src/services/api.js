@@ -180,12 +180,19 @@ export const dashboardAPI = {
 };
 
 // SGC - Sistema de Gestión de Calidad
+// Catálogo en cuatro niveles: dimensión → criterio → indicador → evidencia
 export const sgcAPI = {
-  getAll:         ()         => api.get('/sgc'),
+  getAll:          ()         => api.get('/sgc'),
+  getArbol:        ()         => api.get('/sgc/arbol'),
   getAllWithTasks: ()         => api.get('/sgc/with-tasks'),
-  create:         (data)     => api.post('/sgc', data),
-  update:         (id, data) => api.put(`/sgc/${id}`, data),
-  delete:         (id)       => api.delete(`/sgc/${id}`),
+  // Evidencias (nivel 4)
+  create:          (data)     => api.post('/sgc', data),
+  update:          (id, data) => api.put(`/sgc/${id}`, data),
+  delete:          (id)       => api.delete(`/sgc/${id}`),
+  // Niveles 1 a 3: nivel = 'dimensiones' | 'criterios' | 'indicadores'
+  createNivel:     (nivel, data)     => api.post(`/sgc/${nivel}`, data),
+  updateNivel:     (nivel, id, data) => api.put(`/sgc/${nivel}/${id}`, data),
+  deleteNivel:     (nivel, id)       => api.delete(`/sgc/${nivel}/${id}`),
 };
 
 // My Tasks (tareas del usuario autenticado en todos los proyectos)

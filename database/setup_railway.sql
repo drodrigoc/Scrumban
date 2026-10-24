@@ -178,16 +178,53 @@ CREATE TABLE notifications (
 );
 
 -- 14. SGC - Sistema de Gestion de Calidad
+-- Cuatro niveles: Dimension -> Criterio -> Indicador -> Evidencia
+CREATE TABLE sgc_dimensiones (
+  id          INT PRIMARY KEY AUTO_INCREMENT,
+  codigo      VARCHAR(20) NOT NULL,
+  nombre      VARCHAR(600) NOT NULL,
+  descripcion TEXT DEFAULT NULL,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_dimension_codigo (codigo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE sgc_criterios (
+  id           INT PRIMARY KEY AUTO_INCREMENT,
+  dimension_id INT NOT NULL,
+  codigo       VARCHAR(20) NOT NULL,
+  nombre       VARCHAR(600) NOT NULL,
+  descripcion  TEXT DEFAULT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_criterio_codigo (codigo),
+  FOREIGN KEY (dimension_id) REFERENCES sgc_dimensiones(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE sgc_indicadores (
+  id           INT PRIMARY KEY AUTO_INCREMENT,
+  criterio_id  INT NOT NULL,
+  codigo       VARCHAR(30) NOT NULL,
+  nombre       VARCHAR(600) NOT NULL,
+  descripcion  TEXT DEFAULT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_indicador_codigo (codigo),
+  FOREIGN KEY (criterio_id) REFERENCES sgc_criterios(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE sgc_evidencias (
   id               INT PRIMARY KEY AUTO_INCREMENT,
-  dimension        VARCHAR(255) NOT NULL,
-  criterio         VARCHAR(255) NOT NULL,
+  indicador_id     INT DEFAULT NULL,
+  dimension        VARCHAR(255) DEFAULT NULL,
+  criterio         VARCHAR(255) DEFAULT NULL,
   evidencia        VARCHAR(30) NOT NULL,
-  nombre_evidencia VARCHAR(255) NOT NULL,
+  nombre_evidencia VARCHAR(600) NOT NULL,
   descripcion      TEXT DEFAULT NULL,
   created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_evidencia (evidencia)
+  UNIQUE KEY uq_evidencia (evidencia),
+  CONSTRAINT fk_evidencias_indicador FOREIGN KEY (indicador_id) REFERENCES sgc_indicadores(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE task_sgc (

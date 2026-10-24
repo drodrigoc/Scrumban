@@ -16,9 +16,17 @@ const urlApp = () => (process.env.FRONTEND_URL || 'http://localhost:5173').split
 
 const urlTarea = (projectId, taskId) => `${urlApp()}/projects/${projectId}/kanban?tarea=${taskId}`;
 
+// La fecha llega como objeto Date desde MySQL (columna DATE, leída en UTC)
+// o como texto "2026-11-05" / "2026-11-05T00:00:00.000Z". Se toma solo la
+// parte de calendario y se fija al mediodía para que ninguna zona horaria
+// la corra al día anterior.
 const fecha = (valor) => {
   if (!valor) return null;
-  const d = new Date(String(valor).split('T')[0] + 'T12:00:00');
+  const dia = valor instanceof Date
+    ? valor.toISOString().slice(0, 10)
+    : String(valor).slice(0, 10);
+  const d = new Date(`${dia}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString('es-SV', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 

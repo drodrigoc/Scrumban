@@ -20,6 +20,7 @@ const fs   = require('fs');
 const path = require('path');
 const db     = require('../src/config/database');
 const gdrive = require('../src/services/gdrive');
+const sgcCarpetas = require('../src/services/sgcCarpetas');
 
 const BASE_UPLOAD = process.env.UPLOAD_PATH || './uploads';
 const APLICAR = process.argv.includes('--aplicar');
@@ -56,21 +57,16 @@ async function carpetaDestino(adjunto) {
     return gdrive.ensurePath([CARPETAS_RAIZ.task, await nombreProyecto(adjunto.project_id)]);
   }
 
-  if (!adjunto.evidencia_id) {
-    return gdrive.ensurePath([CARPETAS_RAIZ.sgc, 'Sin clasificar', await nombreProyecto(adjunto.project_id)]);
-  }
+  const [[e]] = adjunto.evidencia_id
+    ? await db.query('SELECT id FROM sgc_evidencias WHERE id = ?', [adjunto.evidencia_id])
+    : [[null]];
 
-  const [[e]] = await db.query('SELECT * FROM sgc_evidencias WHERE id = ?', [adjunto.evidencia_id]);
   if (!e) {
     return gdrive.ensurePath([CARPETAS_RAIZ.sgc, 'Sin clasificar', await nombreProyecto(adjunto.project_id)]);
   }
 
-  return gdrive.ensurePath([
-    CARPETAS_RAIZ.sgc,
-    nombreCarpeta(e.dimension),
-    nombreCarpeta(e.criterio),
-    nombreCarpeta(`${e.evidencia} — ${e.nombre_evidencia}`),
-  ]);
+  // Dimensión / criterio / indicador / evidencia, igual que el backend
+  return sgcCarpetas.carpetaEvidencia(e.id);
 }
 
 // Etiqueta de la ruta, para el modo simulación

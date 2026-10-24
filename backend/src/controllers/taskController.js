@@ -111,8 +111,7 @@ exports.getById = async (req, res) => {
 
     const [sgcAttachments] = await db.query(`
       SELECT ta.*, u.name as uploaded_by_name,
-             e.evidencia AS evidencia_codigo, e.nombre_evidencia,
-             e.dimension, e.criterio
+             e.evidencia AS evidencia_codigo, e.nombre_evidencia
       FROM task_attachments ta
       JOIN users u ON u.id = ta.user_id
       LEFT JOIN sgc_evidencias e ON e.id = ta.evidencia_id
@@ -441,6 +440,7 @@ const fs   = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 const gdrive = require('../services/gdrive');
+const sgcCarpetas = require('../services/sgcCarpetas');
 const BASE_UPLOAD = process.env.UPLOAD_PATH || './uploads';
 
 // Los adjuntos antiguos quedaron en la raíz de uploads/ y los siguientes
@@ -487,25 +487,18 @@ async function carpetaDocumentos(projectId) {
   return gdrive.ensurePath([CARPETAS_RAIZ.task, await nombreProyecto(projectId)]);
 }
 
-// Evidencias SGC: la ruta sale de la taxonomía del catálogo, no del
-// proyecto, porque así se revisan en una auditoría.
+// Evidencias SGC: la ruta sale del catálogo, no del proyecto, porque así
+// se revisan en una auditoría:
 //
-//   SGC/<dimensión>/<criterio>/<código> — <nombre de la evidencia>
+//   SGC/<dimensión>/<criterio>/<indicador>/<evidencia>
 //
-// Las carpetas que falten se crean solas, así que una dimensión, un
-// criterio o una evidencia nuevos aparecen sin tocar nada.
+// Las carpetas que falten se crean solas (ver services/sgcCarpetas.js).
 async function carpetaSGC(evidencia, projectId) {
   if (!evidencia) {
-    // Archivo de evidencia en una tarea sin evidencias vinculadas
+    // Archivo de evidencia sin evidencia asignada (solo archivos antiguos)
     return gdrive.ensurePath([CARPETAS_RAIZ.sgc, 'Sin clasificar', await nombreProyecto(projectId)]);
   }
-
-  return gdrive.ensurePath([
-    CARPETAS_RAIZ.sgc,
-    nombreCarpeta(evidencia.dimension),
-    nombreCarpeta(evidencia.criterio),
-    nombreCarpeta(`${evidencia.evidencia} — ${evidencia.nombre_evidencia}`),
-  ]);
+  return sgcCarpetas.carpetaEvidencia(evidencia.id);
 }
 
 async function guardarAdjunto(req, category, evidencia = null) {
