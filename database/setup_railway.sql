@@ -41,6 +41,7 @@ CREATE TABLE projects (
   status      ENUM('active','paused','completed','cancelled') DEFAULT 'active',
   progress    INT DEFAULT 0,
   owner_id    INT DEFAULT NULL,
+  gdrive_folder_id VARCHAR(255) DEFAULT NULL,
   color       VARCHAR(7) DEFAULT '#3B82F6',
   presupuesto DECIMAL(14,2) DEFAULT NULL,
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -136,6 +137,9 @@ CREATE TABLE task_attachments (
   filesize   INT DEFAULT NULL,
   mimetype   VARCHAR(100) DEFAULT NULL,
   category   VARCHAR(20) NOT NULL DEFAULT 'task',
+  storage_provider VARCHAR(20)  NOT NULL DEFAULT 'local',
+  external_id VARCHAR(255) DEFAULT NULL,
+  evidencia_id INT          DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (task_id) REFERENCES tasks(id)  ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id)  ON DELETE CASCADE
@@ -235,6 +239,38 @@ CREATE TABLE task_sgc (
   FOREIGN KEY (evidencia_id) REFERENCES sgc_evidencias(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Archivos de evidencia: si se elimina una evidencia, sus archivos
+-- quedan sin clasificar (la tabla de adjuntos se creó antes que esta)
+ALTER TABLE task_attachments
+  ADD CONSTRAINT fk_attachments_evidencia
+  FOREIGN KEY (evidencia_id) REFERENCES sgc_evidencias(id) ON DELETE SET NULL;
+
+-- Bitácora de archivos SGC (pestaña Actividad): guarda copia de los
+-- nombres para seguir siendo legible si se borra el archivo, la tarea,
+-- la evidencia o la persona
+CREATE TABLE sgc_actividad (
+  id                 INT PRIMARY KEY AUTO_INCREMENT,
+  accion             VARCHAR(20)  NOT NULL,          -- subida | reasignacion | eliminacion
+  user_id            INT          DEFAULT NULL,
+  usuario_nombre     VARCHAR(255) DEFAULT NULL,
+  attachment_id      INT          DEFAULT NULL,      -- sin FK: el archivo puede haberse eliminado
+  filename           VARCHAR(255) NOT NULL,
+  evidencia_id       INT          DEFAULT NULL,
+  evidencia_codigo   VARCHAR(30)  DEFAULT NULL,
+  evidencia_anterior VARCHAR(30)  DEFAULT NULL,      -- solo en reasignaciones
+  task_id            INT          DEFAULT NULL,
+  task_titulo        VARCHAR(255) DEFAULT NULL,
+  project_id         INT          DEFAULT NULL,
+  created_at         TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_actividad_fecha     (created_at),
+  INDEX idx_actividad_usuario   (user_id, created_at),
+  INDEX idx_actividad_evidencia (evidencia_id),
+  FOREIGN KEY (user_id)      REFERENCES users(id)          ON DELETE SET NULL,
+  FOREIGN KEY (evidencia_id) REFERENCES sgc_evidencias(id) ON DELETE SET NULL,
+  FOREIGN KEY (task_id)      REFERENCES tasks(id)          ON DELETE SET NULL,
+  FOREIGN KEY (project_id)   REFERENCES projects(id)       ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 15. Columnas del tablero Kanban (compartidas por proyecto)
 CREATE TABLE project_kanban_columns (
   id         INT PRIMARY KEY AUTO_INCREMENT,
@@ -327,6 +363,8 @@ CREATE INDEX idx_checklist_task       ON task_checklist_items(task_id);
 CREATE INDEX idx_units_name           ON units(name);
 CREATE INDEX idx_budget_project       ON project_budget_items(project_id, tipo);
 CREATE INDEX idx_phases_project       ON project_phases(project_id, position);
+CREATE INDEX idx_attachments_storage   ON task_attachments(storage_provider);
+CREATE INDEX idx_attachments_evidencia ON task_attachments(evidencia_id);
 
 -- 19. Usuario administrador inicial (contrasena: Admin1234)
 INSERT INTO users (name, email, password, role, is_active)

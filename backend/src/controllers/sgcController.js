@@ -1,6 +1,9 @@
 const logger = require('../config/logger');
 const db     = require('../config/database');
 const sgcCarpetas = require('../services/sgcCarpetas');
+const sgcCobertura = require('../services/sgcCobertura');
+const sgcActividad = require('../services/sgcActividad');
+const { construirLibro } = require('../services/sgcReporte');
 
 /*
  * Catálogo SGC en cuatro niveles:
@@ -126,47 +129,106 @@ exports.getArbol = async (req, res) => {
 };
 
 // GET /api/sgc/with-tasks — evidencias con sus tareas (pestaña Visualización)
+// Cada evidencia trae también sus archivos y su estado calculado
+// (ver services/sgcCobertura.js)
 exports.getAllWithTasks = async (req, res) => {
   try {
-    const [evidencias] = await db.query(SELECT_EVIDENCIA);
-    if (!evidencias.length) return res.json([]);
-
-    const [taskLinks] = await db.query(`
-      SELECT
-        ts.evidencia_id,
-        t.id, t.title, t.status, t.priority, t.due_date,
-        u.name  AS assignee_name,
-        p.name  AS project_name,
-        p.id    AS project_id
-      FROM task_sgc ts
-      JOIN tasks    t ON t.id = ts.task_id
-      LEFT JOIN users u ON u.id = t.assignee_id
-      JOIN projects p   ON p.id = t.project_id
-      ORDER BY ts.evidencia_id, t.created_at DESC
-    `);
-
-    const tasksByEvidencia = taskLinks.reduce((acc, row) => {
-      if (!acc[row.evidencia_id]) acc[row.evidencia_id] = [];
-      acc[row.evidencia_id].push({
-        id:            row.id,
-        title:         row.title,
-        status:        row.status,
-        priority:      row.priority,
-        due_date:      row.due_date,
-        assignee_name: row.assignee_name,
-        project_name:  row.project_name,
-        project_id:    row.project_id,
-      });
-      return acc;
-    }, {});
-
-    res.json(
-      evidencias
-        .sort((a, b) => ordenCodigos(a.evidencia, b.evidencia))
-        .map(e => ({ ...e, tasks: tasksByEvidencia[e.id] || [] }))
-    );
+    res.json(await sgcCobertura.obtenerCobertura());
   } catch (err) {
     responderError(res, err, 'obtener evidencias con tareas');
+  }
+};
+
+// GET /api/sgc/reporte.xlsx?dimension=2&criterio=2.1&indicador=2.1.1
+// El reporte respeta los mismos filtros que se ven en pantalla
+exports.getReporteExcel = async (req, res) => {
+  try {
+    const { dimension, criterio, indicador } = req.query;
+    const evidencias = (await sgcCobertura.obtenerCobertura()).filter(e =>
+      (!dimension || e.dimension === dimension) &&
+      (!criterio  || e.criterio  === criterio)  &&
+      (!indicador || e.indicador === indicador)
+    );
+
+    const filtro = indicador ? `Indicador ${indicador}` : criterio ? `Criterio ${criterio}` : dimension ? `Dimensión ${dimension}` : null;
+    const libro = construirLibro(evidencias, { usuario: req.user.name, filtro });
+
+    const nombre = `Cobertura SGC${filtro ? ` - ${filtro}` : ''} - ${sgcCobertura.hoyLocal()}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${nombre.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(nombre)}`
+    );
+    await libro.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    responderError(res, err, 'generar el reporte');
+  }
+};
+
+// GET /api/sgc/actividad — bitácora de archivos SGC, de lo más reciente a
+// lo más antiguo. Filtros: usuario, accion, desde, hasta (ISO), q, pagina
+const POR_PAGINA = 50;
+
+exports.getActividad = async (req, res) => {
+  try {
+    const { usuario, accion, desde, hasta, q } = req.query;
+    const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
+
+    const condiciones = [];
+    const valores = [];
+    if (usuario) { condiciones.push('a.user_id = ?'); valores.push(Number(usuario)); }
+    if (accion && sgcActividad.ACCIONES.includes(accion)) { condiciones.push('a.accion = ?'); valores.push(accion); }
+    // Llegan como instante ISO: el navegador ya convirtió el día local
+    const fecha = (v) => { const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; };
+    if (desde && fecha(desde)) { condiciones.push('a.created_at >= ?'); valores.push(fecha(desde)); }
+    if (hasta && fecha(hasta)) { condiciones.push('a.created_at < ?');  valores.push(fecha(hasta)); }
+    if (q && q.trim()) {
+      const texto = `%${q.trim()}%`;
+      condiciones.push('(a.filename LIKE ? OR a.evidencia_codigo LIKE ? OR a.evidencia_anterior LIKE ? OR a.task_titulo LIKE ?)');
+      valores.push(texto, `${q.trim()}%`, `${q.trim()}%`, texto);
+    }
+    const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+
+    const [[items], [[{ total }]], [usuarios]] = await Promise.all([
+      db.query(`
+        SELECT a.id, a.accion, a.created_at, a.filename, a.attachment_id,
+               a.evidencia_codigo, a.evidencia_anterior,
+               a.task_id, a.task_titulo, a.project_id,
+               COALESCE(u.name, a.usuario_nombre) AS usuario,
+               p.name AS project_name,
+               e.nombre_evidencia,
+               ta.id IS NOT NULL AS archivo_existe
+          FROM sgc_actividad a
+          LEFT JOIN users u            ON u.id = a.user_id
+          LEFT JOIN projects p         ON p.id = a.project_id
+          LEFT JOIN sgc_evidencias e   ON e.id = a.evidencia_id
+          LEFT JOIN task_attachments ta ON ta.id = a.attachment_id
+          ${where}
+         ORDER BY a.created_at DESC, a.id DESC
+         LIMIT ? OFFSET ?`, [...valores, POR_PAGINA, (pagina - 1) * POR_PAGINA]),
+      db.query(`SELECT COUNT(*) AS total FROM sgc_actividad a ${where}`, valores),
+      db.query(`
+        SELECT a.user_id AS id, COALESCE(u.name, MAX(a.usuario_nombre)) AS name
+          FROM sgc_actividad a
+          LEFT JOIN users u ON u.id = a.user_id
+         WHERE a.user_id IS NOT NULL
+         GROUP BY a.user_id, u.name
+         ORDER BY name`),
+    ]);
+
+    res.json({
+      items: items.map(i => ({ ...i, archivo_existe: Boolean(i.archivo_existe) })),
+      total: Number(total),
+      pagina,
+      por_pagina: POR_PAGINA,
+      usuarios,
+    });
+  } catch (err) {
+    if (err.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(503).json({ message: 'Falta aplicar la migración v7 en la base de datos.' });
+    }
+    responderError(res, err, 'obtener la actividad SGC');
   }
 };
 

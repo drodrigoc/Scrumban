@@ -441,6 +441,7 @@ const path = require('path');
 const { Readable } = require('stream');
 const gdrive = require('../services/gdrive');
 const sgcCarpetas = require('../services/sgcCarpetas');
+const sgcActividad = require('../services/sgcActividad');
 const BASE_UPLOAD = process.env.UPLOAD_PATH || './uploads';
 
 // Los adjuntos antiguos quedaron en la raíz de uploads/ y los siguientes
@@ -615,15 +616,21 @@ exports.uploadSGCAttachment = async (req, res) => {
     // Sin Drive el archivo está una sola vez en disco: duplicar registros
     // dejaría varias filas apuntando al mismo archivo, y borrar una
     // rompería las demás. En ese caso se guarda una sola.
-    if (!gdrive.isEnabled()) {
-      return res.status(201).json([await guardarAdjunto(req, 'sgc', evidencias[0])]);
-    }
+    const destinos = gdrive.isEnabled() ? evidencias : [evidencias[0]];
 
     // En serie, no en paralelo: dos subidas simultáneas podrían crear la
     // misma carpeta dos veces.
     const creados = [];
-    for (const evidencia of evidencias) {
+    for (const evidencia of destinos) {
       creados.push(await guardarAdjunto(req, 'sgc', evidencia));
+    }
+
+    for (const adjunto of creados) {
+      await sgcActividad.registrar({
+        accion: 'subida', usuario: req.user, adjunto,
+        taskId: Number(req.params.id), projectId: Number(req.params.project_id),
+        evidenciaId: adjunto.evidencia_id,
+      });
     }
 
     res.status(201).json(creados);
@@ -640,7 +647,13 @@ exports.deleteSGCAttachment = async (req, res) => {
     );
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
-    await eliminarAdjunto(attachments[0]);
+    const adjunto = attachments[0];
+    await eliminarAdjunto(adjunto);
+    await sgcActividad.registrar({
+      accion: 'eliminacion', usuario: req.user, adjunto,
+      taskId: adjunto.task_id, projectId: Number(req.params.project_id),
+      evidenciaId: adjunto.evidencia_id,
+    });
     res.json({ message: 'Archivo eliminado' });
   } catch (error) {
     logger.error(error);
@@ -688,6 +701,11 @@ exports.reassignSGCAttachment = async (req, res) => {
       req.params.id, req.user.id, 'evidencia',
       attachment.filename, `Reasignado a ${evidencia.evidencia}`
     );
+    await sgcActividad.registrar({
+      accion: 'reasignacion', usuario: req.user, adjunto: attachment,
+      taskId: attachment.task_id, projectId: Number(req.params.project_id),
+      evidenciaId: evidencia.id, evidenciaAnteriorId: attachment.evidencia_id,
+    });
 
     res.json({
       ...attachment,

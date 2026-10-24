@@ -9,6 +9,8 @@ router.use(authenticate);
 router.get('/',            authorizeSGC, ctrl.getAll);
 router.get('/arbol',       authorizeSGC, ctrl.getArbol);
 router.get('/with-tasks',  authorizeSGC, ctrl.getAllWithTasks);
+router.get('/actividad',   authorizeSGC, ctrl.getActividad);
+router.get('/reporte.xlsx', authorizeSGC, ctrl.getReporteExcel);
 
 // Niveles 1 a 3 (solo administradores)
 router.post('/dimensiones',       authorize('admin'), ctrl.createDimension);

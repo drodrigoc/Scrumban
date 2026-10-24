@@ -185,6 +185,10 @@ export const sgcAPI = {
   getAll:          ()         => api.get('/sgc'),
   getArbol:        ()         => api.get('/sgc/arbol'),
   getAllWithTasks: ()         => api.get('/sgc/with-tasks'),
+  // Bitácora de archivos: { usuario, accion, desde, hasta, q, pagina }
+  getActividad:    (params)   => api.get('/sgc/actividad', { params }),
+  // Reporte para auditoría: { dimension, criterio, indicador }
+  descargarReporte: (params)  => api.get('/sgc/reporte.xlsx', { params, responseType: 'blob' }),
   // Evidencias (nivel 4)
   create:          (data)     => api.post('/sgc', data),
   update:          (id, data) => api.put(`/sgc/${id}`, data),
