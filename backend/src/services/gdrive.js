@@ -202,11 +202,15 @@ async function uploadFile({ name, mimeType, buffer, parentId = DRIVE_ID }) {
   const limite   = '-'.repeat(18) + crypto.randomBytes(8).toString('hex');
   const metadata = JSON.stringify({ name, parents: [parentId] });
 
+  // El mimeType lo manda el cliente y va dentro de una cabecera multipart:
+  // se acepta solo con forma tipo/subtipo para evitar inyectar cabeceras
+  const tipo = /^[\w.+-]+\/[\w.+-]+$/.test(mimeType || '') ? mimeType : 'application/octet-stream';
+
   // multipart/related: primero los metadatos en JSON, luego el contenido binario
   const cuerpo = Buffer.concat([
     Buffer.from(
       `--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
-      `--${limite}\r\nContent-Type: ${mimeType || 'application/octet-stream'}\r\n\r\n`
+      `--${limite}\r\nContent-Type: ${tipo}\r\n\r\n`
     ),
     buffer,
     Buffer.from(`\r\n--${limite}--`),

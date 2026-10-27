@@ -1,11 +1,18 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const logger = require('./config/logger');
 const httpLogger = require('./middleware/httpLogger');
+const { cabecerasSeguridad } = require('./middleware/seguridad');
 
 const app = express();
+
+// Railway y el Nginx de producción ponen un proxy delante: sin esto, la IP
+// de todos los usuarios sería la del proxy y el límite de intentos los
+// trataría como una sola persona. TRUST_PROXY=0 lo desactiva.
+app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
+app.disable('x-powered-by');
+app.use(cabecerasSeguridad);
 
 // Middlewares globales
 const ALLOWED_ORIGINS = (process.env.FRONTEND_URL || 'http://localhost:5173')
@@ -23,14 +30,11 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── HTTP request logging ──────────────────────────────────────────────────
 app.use(httpLogger);
-
-// Servir archivos estáticos — un solo punto de entrada cubre tasks/ y sgc/
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Rutas
 app.use('/api/auth', require('./routes/auth'));
@@ -71,8 +75,11 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ message: `El archivo supera el límite de ${mb} MB` });
   }
 
-  res.status(err.status || 500).json({
-    message: err.message || 'Error interno del servidor',
+  // Los errores 4xx traen un mensaje pensado para el usuario; los 500
+  // pueden traer detalles internos (SQL, rutas), que solo van al log
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    message: status < 500 ? err.message : 'Error interno del servidor',
   });
 });
 

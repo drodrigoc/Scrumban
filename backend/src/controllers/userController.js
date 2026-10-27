@@ -2,6 +2,18 @@
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
 
+// Valores válidos de rol y formato mínimo de email
+const ROLES_VALIDOS = ['admin', 'coordinator', 'member', 'superViewer'];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// El id de la URL como entero. MySQL convierte los textos a número a su
+// manera: '10e-1' pasaba la comparación con parseInt (10) y en la consulta
+// valía 1, así que un usuario podía editar el nombre de otro.
+const idDeUrl = (req) => {
+  const id = Number(req.params.id);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
 exports.getAll = async (req, res) => {
   try {
     const [users] = await db.query(
@@ -18,7 +30,7 @@ exports.getById = async (req, res) => {
   try {
     const [users] = await db.query(
       'SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at FROM users WHERE id = ?',
-      [req.params.id]
+      [idDeUrl(req)]
     );
     if (!users.length) return res.status(404).json({ message: 'Usuario no encontrado' });
     res.json(users[0]);
@@ -39,7 +51,14 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
     }
 
-    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
+    if (!EMAIL_REGEX.test(String(email).trim())) {
+      return res.status(400).json({ message: 'El formato del email no es válido' });
+    }
+    if (role && !ROLES_VALIDOS.includes(role)) {
+      return res.status(400).json({ message: 'Rol no válido' });
+    }
+
+    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()]);
     if (existing.length) {
       return res.status(409).json({ message: 'El email ya está registrado' });
     }
@@ -59,6 +78,9 @@ exports.create = async (req, res) => {
       is_active: true,
     });
   } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'El email ya está registrado' });
+    }
     logger.error(error);
     res.status(500).json({ message: 'Error al crear usuario' });
   }
@@ -67,9 +89,10 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { name, email, role, unit, is_active, avatar, sgc_access } = req.body;
-    const { id } = req.params;
+    const id = idDeUrl(req);
+    if (!id) return res.status(400).json({ message: 'Usuario no válido' });
 
-    if (req.user.role !== 'admin' && req.user.id !== parseInt(id)) {
+    if (req.user.role !== 'admin' && req.user.id !== id) {
       return res.status(403).json({ message: 'Sin permisos para editar este usuario' });
     }
 
@@ -77,12 +100,33 @@ exports.update = async (req, res) => {
     const values = [];
 
     if (name)              { fields.push('name = ?');      values.push(name.trim()); }
-    if (email)             { fields.push('email = ?');     values.push(email.toLowerCase().trim()); }
     if (avatar !== undefined) { fields.push('avatar = ?'); values.push(avatar); }
-    if (unit !== undefined)   { fields.push('unit = ?');   values.push(unit || null); }
 
+    // Email y unidad solo los cambia un admin: el email es la identidad del
+    // usuario y la unidad define qué ve un coordinador en la vista de equipo
     if (req.user.role === 'admin') {
-      if (role)                     { fields.push('role = ?');       values.push(role); }
+      if (email) {
+        if (!EMAIL_REGEX.test(String(email).trim())) {
+          return res.status(400).json({ message: 'El formato del email no es válido' });
+        }
+        const [duplicado] = await db.query(
+          'SELECT id FROM users WHERE email = ? AND id != ?',
+          [email.toLowerCase().trim(), id]
+        );
+        if (duplicado.length) {
+          return res.status(409).json({ message: 'El email ya está registrado' });
+        }
+        fields.push('email = ?');
+        values.push(email.toLowerCase().trim());
+      }
+      if (unit !== undefined)       { fields.push('unit = ?');       values.push(unit || null); }
+      if (role) {
+        if (!ROLES_VALIDOS.includes(role)) {
+          return res.status(400).json({ message: 'Rol no válido' });
+        }
+        fields.push('role = ?');
+        values.push(role);
+      }
       if (is_active !== undefined)  { fields.push('is_active = ?');  values.push(is_active); }
       if (sgc_access !== undefined) { fields.push('sgc_access = ?'); values.push(sgc_access ? 1 : 0); }
     }
@@ -98,6 +142,10 @@ exports.update = async (req, res) => {
     );
     res.json(updated[0]);
   } catch (error) {
+    // Carrera entre la verificación y el UPDATE: el índice único lo detiene
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'El email ya está registrado' });
+    }
     logger.error(error);
     res.status(500).json({ message: 'Error al actualizar usuario' });
   }
@@ -106,7 +154,8 @@ exports.update = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { newPassword } = req.body;
-    const { id } = req.params;
+    const id = idDeUrl(req);
+    if (!id) return res.status(400).json({ message: 'Usuario no válido' });
 
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres' });
@@ -123,8 +172,9 @@ exports.resetPassword = async (req, res) => {
 
 exports.toggleStatus = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (req.user.id === parseInt(id)) {
+    const id = idDeUrl(req);
+    if (!id) return res.status(400).json({ message: 'Usuario no válido' });
+    if (req.user.id === id) {
       return res.status(400).json({ message: 'No puedes deshabilitar tu propia cuenta' });
     }
     await db.query('UPDATE users SET is_active = NOT is_active WHERE id = ?', [id]);

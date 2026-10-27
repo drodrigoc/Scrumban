@@ -11,6 +11,45 @@ async function logHistory(taskId, userId, field, oldVal, newVal) {
   } catch (_) {}
 }
 
+// Solo se vinculan etiquetas del mismo proyecto: los ids llegan del
+// cliente y podrían ser de otro
+async function guardarEtiquetas(taskId, projectId, labelIds) {
+  if (!Array.isArray(labelIds) || !labelIds.length) return;
+  await db.query(
+    `INSERT INTO task_labels (task_id, label_id)
+     SELECT ?, id FROM labels WHERE id IN (?) AND project_id = ?`,
+    [taskId, labelIds, projectId]
+  );
+}
+
+/**
+ * La fase y el responsable de una tarea tienen que ser del mismo proyecto.
+ * Sin esto se podía apuntar a la fase de otro proyecto (y leer su nombre)
+ * o asignar la tarea a alguien sin acceso, que recibía su detalle por correo.
+ * Devuelve un mensaje de error o null.
+ */
+async function validarFaseYResponsable(projectId, { phase_id, assignee_id }) {
+  if (phase_id) {
+    const [[fase]] = await db.query(
+      'SELECT id FROM project_phases WHERE id = ? AND project_id = ?', [phase_id, projectId]
+    );
+    if (!fase) return 'La fase no pertenece a este proyecto';
+  }
+  if (assignee_id) {
+    const [[persona]] = await db.query(
+      `SELECT u.id FROM users u
+        WHERE u.id = ? AND u.is_active = 1
+          AND (u.role = 'admin'
+               OR EXISTS (SELECT 1 FROM projects p WHERE p.id = ? AND p.owner_id = u.id)
+               OR EXISTS (SELECT 1 FROM project_members pm
+                           WHERE pm.project_id = ? AND pm.user_id = u.id AND pm.role <> 'viewer'))`,
+      [assignee_id, projectId, projectId]
+    );
+    if (!persona) return 'El responsable debe ser un miembro activo del proyecto';
+  }
+  return null;
+}
+
 exports.getByProject = async (req, res) => {
   try {
     const { project_id } = req.params;
@@ -150,6 +189,9 @@ exports.create = async (req, res) => {
 
     if (!title) return res.status(400).json({ message: 'El título es requerido' });
 
+    const invalido = await validarFaseYResponsable(project_id, { phase_id, assignee_id });
+    if (invalido) return res.status(400).json({ message: invalido });
+
     const [maxPos] = await db.query(
       'SELECT MAX(position) as max FROM tasks WHERE project_id = ? AND status = ?',
       [project_id, status || 'pending']
@@ -169,10 +211,7 @@ exports.create = async (req, res) => {
 
     const taskId = result.insertId;
 
-    if (label_ids && label_ids.length) {
-      const labelValues = label_ids.map(lid => [taskId, lid]);
-      await db.query('INSERT INTO task_labels (task_id, label_id) VALUES ?', [labelValues]);
-    }
+    await guardarEtiquetas(taskId, project_id, label_ids);
 
     if (sgc_ids && sgc_ids.length) {
       const sgcValues = sgc_ids.map(eid => [taskId, eid]);
@@ -199,6 +238,15 @@ exports.update = async (req, res) => {
     if (!current.length) return res.status(404).json({ message: 'Tarea no encontrada' });
 
     const task = current[0];
+
+    // Solo se validan si cambian: una tarea vieja puede tener un responsable
+    // que ya dejó el proyecto, y eso no debe impedir editar el resto
+    const invalido = await validarFaseYResponsable(task.project_id, {
+      phase_id:    phase_id && Number(phase_id) !== task.phase_id ? phase_id : null,
+      assignee_id: assignee_id && Number(assignee_id) !== task.assignee_id ? assignee_id : null,
+    });
+    if (invalido) return res.status(400).json({ message: invalido });
+
     const fields = [];
     const values = [];
     const changes = [];
@@ -263,10 +311,7 @@ exports.update = async (req, res) => {
     // Actualizar etiquetas
     if (label_ids !== undefined) {
       await db.query('DELETE FROM task_labels WHERE task_id = ?', [id]);
-      if (label_ids.length) {
-        const labelValues = label_ids.map(lid => [id, lid]);
-        await db.query('INSERT INTO task_labels (task_id, label_id) VALUES ?', [labelValues]);
-      }
+      await guardarEtiquetas(id, task.project_id, label_ids);
     }
 
     // Actualizar evidencias SGC
@@ -419,7 +464,9 @@ exports.addComment = async (req, res) => {
 
 exports.deleteComment = async (req, res) => {
   try {
-    const [comments] = await db.query('SELECT user_id FROM task_comments WHERE id = ?', [req.params.commentId]);
+    const [comments] = await db.query(
+      'SELECT user_id FROM task_comments WHERE id = ? AND task_id = ?', [req.params.commentId, req.params.id]
+    );
     if (!comments.length) return res.status(404).json({ message: 'Comentario no encontrado' });
     if (comments[0].user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Sin permisos para eliminar este comentario' });
@@ -575,7 +622,8 @@ exports.uploadAttachment = async (req, res) => {
 exports.deleteAttachment = async (req, res) => {
   try {
     const [attachments] = await db.query(
-      'SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'task']
+      'SELECT * FROM task_attachments WHERE id = ? AND task_id = ? AND category = ?',
+      [req.params.attachmentId, req.params.id, 'task']
     );
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
@@ -643,7 +691,8 @@ exports.uploadSGCAttachment = async (req, res) => {
 exports.deleteSGCAttachment = async (req, res) => {
   try {
     const [attachments] = await db.query(
-      'SELECT * FROM task_attachments WHERE id = ? AND category = ?', [req.params.attachmentId, 'sgc']
+      'SELECT * FROM task_attachments WHERE id = ? AND task_id = ? AND category = ?',
+      [req.params.attachmentId, req.params.id, 'sgc']
     );
     if (!attachments.length) return res.status(404).json({ message: 'Archivo no encontrado' });
 
@@ -673,8 +722,8 @@ exports.reassignSGCAttachment = async (req, res) => {
     const { evidencia_id } = req.body;
 
     const [[attachment]] = await db.query(
-      'SELECT * FROM task_attachments WHERE id = ? AND category = ?',
-      [req.params.attachmentId, 'sgc']
+      'SELECT * FROM task_attachments WHERE id = ? AND task_id = ? AND category = ?',
+      [req.params.attachmentId, req.params.id, 'sgc']
     );
     if (!attachment) return res.status(404).json({ message: 'Archivo no encontrado' });
 
@@ -727,7 +776,7 @@ exports.reassignSGCAttachment = async (req, res) => {
 exports.downloadAttachment = async (req, res) => {
   try {
     const [[attachment]] = await db.query(
-      'SELECT * FROM task_attachments WHERE id = ?', [req.params.attachmentId]
+      'SELECT * FROM task_attachments WHERE id = ? AND task_id = ?', [req.params.attachmentId, req.params.id]
     );
     if (!attachment) return res.status(404).json({ message: 'Archivo no encontrado' });
 
@@ -753,18 +802,5 @@ exports.downloadAttachment = async (req, res) => {
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al descargar el archivo' });
-  }
-};
-
-exports.updatePositions = async (req, res) => {
-  try {
-    const { tasks } = req.body; // Array de { id, status, position }
-    for (const t of tasks) {
-      await db.query('UPDATE tasks SET status = ?, position = ? WHERE id = ?', [t.status, t.position, t.id]);
-    }
-    res.json({ message: 'Posiciones actualizadas' });
-  } catch (error) {
-    logger.error(error);
-    res.status(500).json({ message: 'Error al actualizar posiciones' });
   }
 };

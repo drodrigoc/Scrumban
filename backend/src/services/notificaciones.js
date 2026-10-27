@@ -1,9 +1,9 @@
 /**
  * Punto único de salida de las notificaciones.
  *
- * Cada evento crea la notificación dentro del sistema (la campana) y, si
- * el destinatario tiene los correos activados y hay una cuenta de correo
- * conectada, encola también el correo. Así ninguna notificación queda sin
+ * Cada evento crea la notificación dentro del sistema (la campana) y
+ * encola también el correo, que sale cuando hay una cuenta de correo
+ * conectada. Los avisos por correo no son opcionales para el usuario. Así ninguna notificación queda sin
  * su correo ni al revés.
  *
  * Nada de lo que pase aquí debe interrumpir la acción del usuario: los
@@ -43,9 +43,9 @@ async function notificar({ userId, titulo, mensaje, tipo, refId = null, refType 
 
   try {
     const [[usuario]] = await db.query(
-      'SELECT email, is_active, email_notifications FROM users WHERE id = ?', [userId]
+      'SELECT email, is_active FROM users WHERE id = ?', [userId]
     );
-    if (!usuario?.email || !usuario.is_active || !usuario.email_notifications) return;
+    if (!usuario?.email || !usuario.is_active) return;
 
     const { asunto, html, texto } = render(correo.plantilla, correo.datos);
     await email.encolar({ para: usuario.email, userId, asunto, html, texto, tipo: correo.plantilla });

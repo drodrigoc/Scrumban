@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { tasksAPI, projectsAPI, sgcAPI, phasesAPI, getUploadUrl } from '../../services/api';
+import { tasksAPI, projectsAPI, sgcAPI, phasesAPI } from '../../services/api';
 import {
   Trash2, Send, Paperclip, Clock, Tag, User, Calendar,
   AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck, Layers,
@@ -92,8 +92,8 @@ function seguirAvance(setSubida) {
   };
 }
 
-// Los archivos en Google Drive no tienen URL pública: se piden al backend
-// con la sesión y se entregan al navegador como descarga.
+// Ningún adjunto tiene URL pública (ni en Drive ni en el disco del
+// servidor): se piden al backend con la sesión y se entregan como descarga.
 async function descargarAdjunto(projectId, taskId, adjunto) {
   try {
     const { data } = await tasksAPI.downloadAttachment(projectId, taskId, adjunto.id);
@@ -110,39 +110,24 @@ async function descargarAdjunto(projectId, taskId, adjunto) {
   }
 }
 
-// Los adjuntos locales conservan su enlace directo de siempre; los de
-// Drive pasan por el backend.
-function EnlaceDescarga({ adjunto, projectId, taskId, categoria, className }) {
+function EnlaceDescarga({ adjunto, projectId, taskId, className }) {
   const [descargando, setDescargando] = useState(false);
 
-  if (adjunto.storage_provider === 'gdrive') {
-    // El archivo viaja de Drive al servidor y de ahí al navegador, así que
-    // puede tardar un momento: sin aviso, el botón parecería no responder.
-    return (
-      <button
-        type="button"
-        disabled={descargando}
-        onClick={async () => {
-          setDescargando(true);
-          await descargarAdjunto(projectId, taskId, adjunto);
-          setDescargando(false);
-        }}
-        className={`${className} disabled:opacity-60 disabled:cursor-wait`}
-      >
-        {descargando ? 'Descargando…' : 'Descargar'}
-      </button>
-    );
-  }
-
+  // El archivo viaja al navegador a través del servidor, así que puede
+  // tardar un momento: sin aviso, el botón parecería no responder.
   return (
-    <a
-      href={getUploadUrl(categoria, adjunto.filepath)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={className}
+    <button
+      type="button"
+      disabled={descargando}
+      onClick={async () => {
+        setDescargando(true);
+        await descargarAdjunto(projectId, taskId, adjunto);
+        setDescargando(false);
+      }}
+      className={`${className} disabled:opacity-60 disabled:cursor-wait`}
     >
-      Descargar
-    </a>
+      {descargando ? 'Descargando…' : 'Descargar'}
+    </button>
   );
 }
 
@@ -168,7 +153,6 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
             adjunto={a}
             projectId={projectId}
             taskId={task.id}
-            categoria="task"
             className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
           />
           {!readOnly && (
@@ -856,7 +840,6 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                   adjunto={a}
                   projectId={projectId}
                   taskId={task.id}
-                  categoria="sgc"
                   className="text-xs text-green-600 dark:text-green-400 hover:underline flex-shrink-0"
                 />
                 {!readOnly && (

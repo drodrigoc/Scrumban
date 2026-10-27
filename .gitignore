@@ -1,0 +1,28 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Compilados
+dist/
+build/
+
+# Variables de entorno: nunca se versionan (el ejemplo sí)
+.env
+.env.*
+!.env.example
+
+# Registros y archivos subidos por los usuarios
+logs/
+uploads/
+*.log
+
+# Configuración local de Claude Code
+.claude/settings.local.json
+
+# Credenciales de cuentas de servicio de Google — NUNCA se versionan.
+# Quien tenga este archivo puede escribir en la Unidad Compartida.
+*.iam.gserviceaccount.com.json
+service-account*.json
+credentials*.json
+gdrive-*.json
+sistema-de-calidad-*.json

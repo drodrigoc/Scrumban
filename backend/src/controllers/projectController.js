@@ -2,6 +2,8 @@
 const db = require('../config/database');
 const notificaciones = require('../services/notificaciones');
 
+const ROLES_PROYECTO = ['coordinator', 'member', 'viewer'];
+
 exports.getAll = async (req, res) => {
   try {
     let query;
@@ -67,15 +69,7 @@ exports.getById = async (req, res) => {
     if (!projects.length) return res.status(404).json({ message: 'Proyecto no encontrado' });
 
     const project = projects[0];
-
-    // Verificar acceso
-    if (!['admin', 'superViewer'].includes(req.user.role) && project.owner_id !== req.user.id) {
-      const [membership] = await db.query(
-        'SELECT id FROM project_members WHERE project_id = ? AND user_id = ?',
-        [req.params.id, req.user.id]
-      );
-      if (!membership.length) return res.status(403).json({ message: 'Sin acceso a este proyecto' });
-    }
+    // El acceso ya lo verificó la ruta (requireProjectAccess)
 
     // Obtener miembros
     const [members] = await db.query(
@@ -96,7 +90,13 @@ exports.getById = async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo) });
+    // Qué puede hacer quien consulta, para que la interfaz no ofrezca
+    // acciones que el servidor va a rechazar
+    const { lectura, escritura, gestion } = req.acceso;
+    res.json({
+      ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo),
+      mi_acceso: { lectura, escritura, gestion },
+    });
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al obtener proyecto' });
@@ -105,22 +105,43 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    // Igual que en la interfaz: solo administradores y coordinadores crean
+    // proyectos (el Super Visor es de solo lectura)
+    if (!['admin', 'coordinator'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Solo administradores y coordinadores pueden crear proyectos' });
+    }
+
     const { name, description, objectives, start_date, end_date, status, color, members, presupuesto } = req.body;
 
     if (!name) return res.status(400).json({ message: 'El nombre es requerido' });
 
-    const [result] = await db.query(
-      `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id, presupuesto)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, description, objectives, start_date, end_date, status || 'active', color || '#3B82F6', req.user.id, presupuesto || null]
-    );
+    if (members?.some(m => m.role && !ROLES_PROYECTO.includes(m.role))) {
+      return res.status(400).json({ message: 'Rol de miembro no válido' });
+    }
 
-    const projectId = result.insertId;
+    // El proyecto y sus miembros se guardan juntos: si falla un miembro,
+    // no queda un proyecto a medias
+    const conn = await db.getConnection();
+    let projectId;
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.query(
+        `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id, presupuesto)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [name, description, objectives, start_date, end_date, status || 'active', color || '#3B82F6', req.user.id, presupuesto || null]
+      );
+      projectId = result.insertId;
 
-    // Agregar miembros si se proporcionaron
-    if (members && members.length) {
-      const memberValues = members.map(m => [projectId, m.user_id, m.role || 'member']);
-      await db.query('INSERT INTO project_members (project_id, user_id, role) VALUES ?', [memberValues]);
+      if (members && members.length) {
+        const memberValues = members.map(m => [projectId, m.user_id, m.role || 'member']);
+        await conn.query('INSERT INTO project_members (project_id, user_id, role) VALUES ?', [memberValues]);
+      }
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
     }
 
     const [projects] = await db.query('SELECT * FROM projects WHERE id = ?', [projectId]);
@@ -184,6 +205,12 @@ exports.addMember = async (req, res) => {
     const { user_id, role } = req.body;
     const { id } = req.params;
 
+    if (role && !ROLES_PROYECTO.includes(role)) {
+      return res.status(400).json({ message: 'Rol no válido' });
+    }
+    const [[usuario]] = await db.query('SELECT id FROM users WHERE id = ? AND is_active = 1', [user_id]);
+    if (!usuario) return res.status(400).json({ message: 'El usuario no existe o está deshabilitado' });
+
     const [existing] = await db.query(
       'SELECT id FROM project_members WHERE project_id = ? AND user_id = ?',
       [id, user_id]
@@ -209,27 +236,10 @@ exports.updateMemberRole = async (req, res) => {
     const { role } = req.body;
     const { id, userId } = req.params;
 
-    const allowed = ['coordinator', 'member', 'viewer'];
-    if (!allowed.includes(role)) {
+    if (!ROLES_PROYECTO.includes(role)) {
       return res.status(400).json({ message: 'Rol no válido' });
     }
-
-    // Solo puede cambiar roles: admin, coordinador global, dueño del proyecto
-    // o quien tenga project_role = coordinator en este proyecto
-    if (!['admin', 'coordinator'].includes(req.user.role)) {
-      const [proj] = await db.query('SELECT owner_id FROM projects WHERE id = ?', [id]);
-      if (!proj.length) return res.status(404).json({ message: 'Proyecto no encontrado' });
-
-      if (proj[0].owner_id !== req.user.id) {
-        const [membership] = await db.query(
-          'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
-          [id, req.user.id]
-        );
-        if (!membership.length || membership[0].role !== 'coordinator') {
-          return res.status(403).json({ message: 'Sin permisos para cambiar roles' });
-        }
-      }
-    }
+    // Quién puede cambiar roles lo decide la ruta (nivel "gestion")
 
     await db.query(
       'UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?',
@@ -260,6 +270,7 @@ exports.getLabels = async (req, res) => {
     const [labels] = await db.query('SELECT * FROM labels WHERE project_id = ?', [req.params.id]);
     res.json(labels);
   } catch (error) {
+    logger.error(error);
     res.status(500).json({ message: 'Error al obtener etiquetas' });
   }
 };
@@ -267,12 +278,14 @@ exports.getLabels = async (req, res) => {
 exports.createLabel = async (req, res) => {
   try {
     const { name, color } = req.body;
+    if (!name?.trim()) return res.status(400).json({ message: 'El nombre es requerido' });
     const [result] = await db.query(
       'INSERT INTO labels (name, color, project_id) VALUES (?, ?, ?)',
       [name, color || '#6366F1', req.params.id]
     );
     res.status(201).json({ id: result.insertId, name, color: color || '#6366F1', project_id: req.params.id });
   } catch (error) {
+    logger.error(error);
     res.status(500).json({ message: 'Error al crear etiqueta' });
   }
 };
@@ -319,6 +332,9 @@ exports.saveColumns = async (req, res) => {
 
   if (!Array.isArray(columns) || !columns.length) {
     return res.status(400).json({ message: 'Se requiere al menos una columna' });
+  }
+  if (columns.some(c => !c || typeof c !== 'object' || typeof c.column_key !== 'string' || !c.column_key.trim())) {
+    return res.status(400).json({ message: 'Cada columna necesita una clave' });
   }
   if (!columns.some(c => c.column_key === 'completed')) {
     return res.status(400).json({ message: 'La columna "completed" no se puede eliminar' });

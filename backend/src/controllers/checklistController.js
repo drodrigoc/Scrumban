@@ -57,12 +57,15 @@ exports.updateItem = async (req, res) => {
     if (!fields.length) return res.status(400).json({ message: 'Sin campos para actualizar' });
 
     values.push(item_id, task_id);
-    await db.query(
+    const [resultado] = await db.query(
       `UPDATE task_checklist_items SET ${fields.join(', ')} WHERE id = ? AND task_id = ?`,
       values
     );
+    if (!resultado.affectedRows) return res.status(404).json({ message: 'Ítem no encontrado' });
 
-    const [items] = await db.query('SELECT * FROM task_checklist_items WHERE id = ?', [item_id]);
+    const [items] = await db.query(
+      'SELECT * FROM task_checklist_items WHERE id = ? AND task_id = ?', [item_id, task_id]
+    );
     res.json(items[0]);
   } catch (error) {
     logger.error(error);

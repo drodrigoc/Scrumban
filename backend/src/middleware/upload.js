@@ -13,24 +13,11 @@ const sgcDir   = path.join(baseDir, 'sgc');
 
 // Tipos de archivo aceptados.
 //
-// Se valida por mimetype y, si no coincide, por extensión: el mimetype lo
-// declara el navegador según el registro del sistema operativo, y Windows
-// manda cosas inesperadas — 'application/octet-stream' para archivos de
-// texto, 'application/x-zip-compressed' para los .zip. Validar solo por
-// mimetype rechazaba archivos perfectamente válidos.
-const MIMES_PERMITIDOS = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain', 'text/csv', 'text/markdown', 'application/rtf', 'text/rtf',
-  'application/zip', 'application/x-zip-compressed', 'multipart/x-zip',
-];
-
+// Se valida SOLO por extensión: el mimetype lo declara el cliente (en
+// Windows llegan cosas inesperadas, como 'application/octet-stream' para
+// texto o 'application/x-zip-compressed' para los .zip) y no es confiable.
+// Aceptar por mimetype permitía, por ejemplo, subir un .html declarado
+// como text/plain.
 const EXTENSIONES_PERMITIDAS = [
   '.jpg', '.jpeg', '.png', '.gif', '.webp',
   '.pdf',
@@ -42,7 +29,7 @@ const EXTENSIONES_PERMITIDAS = [
 const fileFilter = (req, file, cb) => {
   const extension = path.extname(file.originalname).toLowerCase();
 
-  if (MIMES_PERMITIDOS.includes(file.mimetype) || EXTENSIONES_PERMITIDAS.includes(extension)) {
+  if (EXTENSIONES_PERMITIDAS.includes(extension)) {
     return cb(null, true);
   }
 

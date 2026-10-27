@@ -5,13 +5,6 @@ import axios from 'axios';
 const BACKEND_ORIGIN = import.meta.env.VITE_API_URL || '';
 const BASE = BACKEND_ORIGIN ? `${BACKEND_ORIGIN}/api` : '/api';
 
-// Construye la URL absoluta de un archivo adjunto
-// category: 'task' → carpeta tasks/, 'sgc' → carpeta sgc/
-export const getUploadUrl = (category, filepath) => {
-  const folder = category === 'sgc' ? 'sgc' : 'tasks';
-  return `${BACKEND_ORIGIN}/uploads/${folder}/${filepath}`;
-};
-
 const api = axios.create({
   baseURL: BASE,
   headers: { 'Content-Type': 'application/json' },
@@ -41,11 +34,8 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
-  changePassword: (data) => api.put('/auth/change-password', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data) => api.post('/auth/reset-password', data),
-  getPreferences: () => api.get('/auth/preferences'),
-  updatePreferences: (data) => api.put('/auth/preferences', data),
 };
 
 // Configuración del sistema (solo administradores)
@@ -118,7 +108,6 @@ export const tasksAPI = {
   create: (projectId, data) => api.post(`/projects/${projectId}/tasks`, data),
   update: (projectId, id, data) => api.put(`/projects/${projectId}/tasks/${id}`, data),
   delete: (projectId, id) => api.delete(`/projects/${projectId}/tasks/${id}`),
-  updatePositions: (projectId, tasks) => api.patch(`/projects/${projectId}/tasks/positions`, { tasks }),
   // Archivado
   archive: (projectId, id) => api.patch(`/projects/${projectId}/tasks/${id}/archive`),
   unarchive: (projectId, id) => api.patch(`/projects/${projectId}/tasks/${id}/unarchive`),

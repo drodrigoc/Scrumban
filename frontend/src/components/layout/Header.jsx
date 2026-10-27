@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, CheckCheck, Sun, Moon, KeyRound, LogOut, Eye, EyeOff, ChevronDown, Mail } from 'lucide-react';
+import { Menu, Bell, CheckCheck, Sun, Moon, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { notificationsAPI, authAPI } from '../../services/api';
+import { notificationsAPI } from '../../services/api';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'react-toastify';
-import Modal from '../common/Modal';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
@@ -19,29 +17,6 @@ export default function Header({ onMenuClick }) {
   const [showNotif, setShowNotif]         = useState(false);
 
   const [showUserMenu, setShowUserMenu]   = useState(false);
-  const [showPassModal, setShowPassModal] = useState(false);
-  // null = todavía no se cargó (o falta la migración del servidor)
-  const [recibeCorreos, setRecibeCorreos] = useState(null);
-
-  // La preferencia se consulta al abrir el menú, no en cada página
-  useEffect(() => {
-    if (!showUserMenu || recibeCorreos !== null) return;
-    authAPI.getPreferences()
-      .then(({ data }) => setRecibeCorreos(data.email_notifications))
-      .catch(() => { /* sin preferencia disponible: el interruptor no se muestra */ });
-  }, [showUserMenu, recibeCorreos]);
-
-  const alternarCorreos = async () => {
-    const nuevo = !recibeCorreos;
-    setRecibeCorreos(nuevo);
-    try {
-      await authAPI.updatePreferences({ email_notifications: nuevo });
-      toast.success(nuevo ? 'Recibirás notificaciones por correo' : 'Ya no recibirás notificaciones por correo');
-    } catch {
-      setRecibeCorreos(!nuevo);
-      toast.error('No se pudo guardar tu preferencia');
-    }
-  };
 
   const notifRef    = useRef(null);
   const userMenuRef = useRef(null);
@@ -214,32 +189,7 @@ export default function Header({ onMenuClick }) {
                   <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
                 </div>
 
-                {/* Opciones */}
                 <div className="py-1">
-                  <button
-                    onClick={() => { setShowUserMenu(false); setShowPassModal(true); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
-                  >
-                    <KeyRound className="w-4 h-4 text-gray-400" />
-                    Cambiar contraseña
-                  </button>
-                  {recibeCorreos !== null && (
-                    <button
-                      onClick={alternarCorreos}
-                      role="switch"
-                      aria-checked={recibeCorreos}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
-                    >
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span className="flex-1 text-left">Avisos por correo</span>
-                      <span className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full transition-colors ${recibeCorreos ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${recibeCorreos ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                      </span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="border-t border-gray-100 dark:border-gray-700 py-1">
                   <button
                     onClick={() => { setShowUserMenu(false); logout(); navigate('/login'); }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -254,84 +204,6 @@ export default function Header({ onMenuClick }) {
 
         </div>
       </header>
-
-      {/* ── Modal cambiar contraseña ── */}
-      {showPassModal && (
-        <Modal title="Cambiar contraseña" onClose={() => setShowPassModal(false)} size="sm">
-          <ChangePasswordForm onClose={() => setShowPassModal(false)} />
-        </Modal>
-      )}
     </>
-  );
-}
-
-function ChangePasswordForm({ onClose }) {
-  const [form, setForm]       = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  const [show, setShow]       = useState({ current: false, newP: false, confirm: false });
-  const [saving, setSaving]   = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (form.newPassword !== form.confirmPassword) {
-      toast.error('Las contraseñas nuevas no coinciden');
-      return;
-    }
-    if (form.newPassword.length < 8) {
-      toast.error('La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-    setSaving(true);
-    try {
-      await authAPI.changePassword({ currentPassword: form.currentPassword, newPassword: form.newPassword });
-      toast.success('Contraseña actualizada correctamente');
-      onClose();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al cambiar la contraseña');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const Field = ({ id, label, value, showKey }) => (
-    <div>
-      <label className="label">{label}</label>
-      <div className="relative">
-        <input
-          type={show[showKey] ? 'text' : 'password'}
-          className="input pr-10"
-          placeholder="••••••••"
-          value={value}
-          onChange={e => setForm({ ...form, [id]: e.target.value })}
-          required
-        />
-        <button
-          type="button"
-          onClick={() => setShow(s => ({ ...s, [showKey]: !s[showKey] }))}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        >
-          {show[showKey] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Field id="currentPassword" label="Contraseña actual"       value={form.currentPassword} showKey="current" />
-      <Field id="newPassword"     label="Nueva contraseña"        value={form.newPassword}     showKey="newP"    />
-      <Field id="confirmPassword" label="Confirmar nueva contraseña" value={form.confirmPassword} showKey="confirm" />
-
-      <p className="text-xs text-gray-400 dark:text-gray-500">Mínimo 8 caracteres.</p>
-
-      <div className="flex gap-2 pt-1">
-        <button type="button" className="btn-secondary flex-1" onClick={onClose}>Cancelar</button>
-        <button type="submit" disabled={saving} className="btn-primary flex-1">
-          {saving
-            ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            : 'Actualizar'
-          }
-        </button>
-      </div>
-    </form>
   );
 }

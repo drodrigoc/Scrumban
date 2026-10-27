@@ -10,9 +10,13 @@ const { render, urlApp } = require('../services/plantillasCorreo');
 // leyera la tabla, no podría usar los enlaces vigentes
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
+// Hash bcrypt (costo 10) de una contraseña descartable; solo sirve para
+// igualar el tiempo de respuesta del login cuando el email no existe
+const HASH_FALSO = '$2a$10$SM.DVlMYErm/WfAxCudsHekRW78X7nhf.frdH87uB1AufENxn0NSO';
+
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    expiresIn: process.env.JWT_EXPIRES_IN || '12h',
   });
 };
 
@@ -29,19 +33,19 @@ exports.login = async (req, res) => {
       [email.toLowerCase().trim()]
     );
 
-    if (!users.length) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
-    }
-
     const user = users[0];
 
-    if (!user.is_active) {
-      return res.status(403).json({ message: 'Cuenta deshabilitada. Contacte al administrador.' });
+    // Si el email no existe se compara contra un hash falso: así la respuesta
+    // tarda lo mismo y no se puede descubrir qué correos están registrados
+    const isMatch = await bcrypt.compare(String(password), user && user.password ? user.password : HASH_FALSO);
+    if (!user || !isMatch) {
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
+    // La cuenta deshabilitada se informa solo con la contraseña correcta,
+    // para no revelar a terceros qué emails existen
+    if (!user.is_active) {
+      return res.status(403).json({ message: 'Cuenta deshabilitada. Contacte al administrador.' });
     }
 
     const token = generateToken(user.id);
@@ -63,35 +67,6 @@ exports.getMe = async (req, res) => {
     res.json(users[0]);
   } catch (error) {
     logger.error('GetMe error:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
-};
-
-exports.changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: 'Se requieren ambas contraseñas' });
-    }
-
-    if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 8 caracteres' });
-    }
-
-    const [users] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
-    const isMatch = await bcrypt.compare(currentPassword, users[0].password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Contraseña actual incorrecta' });
-    }
-
-    const hashed = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [hashed, req.user.id]);
-
-    res.json({ message: 'Contraseña actualizada correctamente' });
-  } catch (error) {
-    logger.error('ChangePassword error:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
@@ -120,21 +95,14 @@ exports.forgotPassword = async (req, res) => {
       [hashToken(resetToken), usuario.id]
     );
 
-    let enviado = false;
     try {
       const { asunto, html, texto } = render('recuperarContrasena', {
         nombre: usuario.name,
         enlace: `${urlApp()}/forgot-password?token=${resetToken}`,
       });
-      enviado = await email.encolar({ para: usuario.email, userId: usuario.id, asunto, html, texto, tipo: 'recuperarContrasena' });
+      await email.encolar({ para: usuario.email, userId: usuario.id, asunto, html, texto, tipo: 'recuperarContrasena' });
     } catch (error) {
       logger.error('No se pudo encolar el correo de recuperación', { message: error.message });
-    }
-
-    // Sin cuenta de correo conectada, en desarrollo local el token se
-    // devuelve para poder probar el flujo. Nunca cuando el correo funciona.
-    if (!enviado && process.env.NODE_ENV === 'development') {
-      return res.json({ ...respuesta, resetToken });
     }
 
     res.json(respuesta);
@@ -171,31 +139,5 @@ exports.resetPassword = async (req, res) => {
   } catch (error) {
     logger.error('ResetPassword error:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
-  }
-};
-
-// GET /api/auth/preferences
-exports.getPreferences = async (req, res) => {
-  try {
-    const [[fila]] = await db.query('SELECT email_notifications FROM users WHERE id = ?', [req.user.id]);
-    res.json({ email_notifications: Boolean(fila?.email_notifications) });
-  } catch (error) {
-    logger.error('GetPreferences error:', error);
-    res.status(500).json({ message: 'No se pudieron cargar tus preferencias' });
-  }
-};
-
-// PUT /api/auth/preferences  { email_notifications }
-exports.updatePreferences = async (req, res) => {
-  try {
-    const { email_notifications } = req.body;
-    if (typeof email_notifications !== 'boolean') {
-      return res.status(400).json({ message: 'email_notifications debe ser verdadero o falso' });
-    }
-    await db.query('UPDATE users SET email_notifications = ? WHERE id = ?', [email_notifications, req.user.id]);
-    res.json({ email_notifications });
-  } catch (error) {
-    logger.error('UpdatePreferences error:', error);
-    res.status(500).json({ message: 'No se pudieron guardar tus preferencias' });
   }
 };

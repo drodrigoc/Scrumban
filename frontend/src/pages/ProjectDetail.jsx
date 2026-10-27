@@ -87,11 +87,9 @@ export default function ProjectDetail() {
   const totalTasks = taskStats.reduce((sum, s) => sum + s.count, 0);
   const completedTasks = taskStats.find(s => s.status === 'completed')?.count || 0;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const myProjectRole = project.members?.find(m => m.id === user?.id)?.project_role;
-  const canEdit = user?.role === 'admin'
-    || user?.role === 'coordinator'
-    || project.owner_id === user?.id
-    || myProjectRole === 'coordinator';
+  // Editar el proyecto, sus miembros, presupuesto y fases: lo decide el
+  // servidor según el rol en el proyecto (mi_acceso.gestion)
+  const canEdit = Boolean(project.mi_acceso?.gestion);
 
   const presupuesto  = project.presupuesto  != null ? parseFloat(project.presupuesto)  : null;
   const totalCosto   = project.total_costo  != null ? parseFloat(project.total_costo)  : 0;

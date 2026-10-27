@@ -408,6 +408,7 @@ export default function KanbanBoard() {
   const [tasks, setTasks] = useState([]);
   const [project, setProject] = useState(null);
   const [members, setMembers] = useState([]);
+  const [miAcceso, setMiAcceso] = useState(null);
   const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState(null);
@@ -486,6 +487,7 @@ export default function KanbanBoard() {
       setTasks(t.data);
       setProject(p.data);
       setMembers(p.data.members || []);
+      setMiAcceso(p.data.mi_acceso || null);
       setLabels(l.data);
     }).catch(() => toast.error('Error al cargar tablero'))
       .finally(() => setLoading(false));
@@ -504,11 +506,9 @@ export default function KanbanBoard() {
     }
   }, [projectId]);
 
-  const canEdit = useMemo(() => {
-    if (user?.role === 'admin') return true;
-    const me = members.find(m => m.id === user?.id);
-    return !me || me.project_role !== 'viewer';
-  }, [user, members]);
+  // Lo decide el servidor (mi_acceso): antes, quien no era miembro del
+  // proyecto veía los botones de edición
+  const canEdit = Boolean(miAcceso?.escritura);
 
   const windowCutoff = useMemo(
     () => (completedWindow > 0 ? new Date(Date.now() - completedWindow * 24 * 60 * 60 * 1000) : null),

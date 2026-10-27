@@ -1,13 +1,13 @@
 const router = require('express').Router();
 const ctrl = require('../controllers/authController');
 const { authenticate } = require('../middleware/auth');
+const {
+  limiteLoginCuenta, limiteLoginCorreo, limiteLoginIP, limiteRecuperacion, limiteRestablecer,
+} = require('../middleware/seguridad');
 
-router.post('/login', ctrl.login);
-router.post('/forgot-password', ctrl.forgotPassword);
-router.post('/reset-password', ctrl.resetPassword);
+router.post('/login', limiteLoginIP, limiteLoginCorreo, limiteLoginCuenta, ctrl.login);
+router.post('/forgot-password', limiteRecuperacion, ctrl.forgotPassword);
+router.post('/reset-password', limiteRestablecer, ctrl.resetPassword);
 router.get('/me', authenticate, ctrl.getMe);
-router.put('/change-password', authenticate, ctrl.changePassword);
-router.get('/preferences', authenticate, ctrl.getPreferences);
-router.put('/preferences', authenticate, ctrl.updatePreferences);
 
 module.exports = router;

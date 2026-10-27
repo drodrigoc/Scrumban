@@ -27,6 +27,7 @@ export default function ArchiveView() {
   const [tasks, setTasks]       = useState([]);
   const [project, setProject]   = useState(null);
   const [members, setMembers]   = useState([]);
+  const [miAcceso, setMiAcceso] = useState(null);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
   const [collapsed, setCollapsed] = useState({});
@@ -40,15 +41,14 @@ export default function ArchiveView() {
       setTasks(t.data);
       setProject(p.data);
       setMembers(p.data.members || []);
+      setMiAcceso(p.data.mi_acceso || null);
     }).catch(() => toast.error('Error al cargar el archivo'))
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  const canEdit = useMemo(() => {
-    if (user?.role === 'admin') return true;
-    const me = members.find(m => m.id === user?.id);
-    return !me || me.project_role !== 'viewer';
-  }, [user, members]);
+  // Lo decide el servidor (mi_acceso): antes, quien no era miembro del
+  // proyecto veía los botones de edición
+  const canEdit = Boolean(miAcceso?.escritura);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
