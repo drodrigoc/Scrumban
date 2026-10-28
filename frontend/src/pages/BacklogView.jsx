@@ -69,72 +69,6 @@ function StatusSelect({ value, onChange, columns }) {
   );
 }
 
-// ── Componente QuickAddRow ────────────────────────────────────────────────
-function QuickAddRow({ onAdd, members, onCancel }) {
-  const [title, setTitle] = useState('');
-  const [assignee, setAssignee] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [dueDate, setDueDate] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-    onAdd({ title: title.trim(), assignee_id: assignee || null, priority, due_date: dueDate || null });
-    setTitle(''); setAssignee(''); setPriority('medium'); setDueDate('');
-  };
-
-  return (
-    <tr className="bg-primary-50/40 dark:bg-primary-900/10 border-t-2 border-primary-200 dark:border-primary-700">
-      <td className="px-4 py-2" colSpan={1}>
-        <form id="quick-add" onSubmit={handleSubmit} className="flex items-center gap-2 w-full">
-          <Plus className="w-4 h-4 text-primary-500 flex-shrink-0" />
-          <input
-            autoFocus
-            type="text"
-            placeholder="Título de la nueva tarea..."
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="flex-1 bg-transparent text-sm text-gray-800 dark:text-gray-200 placeholder-gray-400
-                       focus:outline-none min-w-0"
-          />
-        </form>
-      </td>
-      <td className="px-2 py-2 w-32">
-        <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${statusCfg.pending.color}`}>
-          Pendiente
-        </span>
-      </td>
-      <td className="px-2 py-2 w-28">
-        <select value={priority} onChange={e => setPriority(e.target.value)}
-          className="text-xs w-full bg-transparent border border-gray-200 dark:border-gray-600
-                     rounded-md px-1 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-400">
-          {Object.entries(priorityCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-      </td>
-      <td className="px-2 py-2 w-36">
-        <select value={assignee} onChange={e => setAssignee(e.target.value)}
-          className="text-xs w-full bg-transparent border border-gray-200 dark:border-gray-600
-                     rounded-md px-1 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-400">
-          <option value="">Sin asignar</option>
-          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </td>
-      <td className="px-2 py-2 w-28" />
-      <td className="px-2 py-2 w-28">
-        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-          className="text-xs w-full bg-transparent border border-gray-200 dark:border-gray-600
-                     rounded-md px-1 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-400" />
-      </td>
-      <td colSpan={3} className="px-2 py-2">
-        <div className="flex items-center gap-2">
-          <button type="submit" form="quick-add" className="btn-primary text-xs py-1 px-3">Agregar</button>
-          <button type="button" onClick={onCancel} className="btn-secondary text-xs py-1 px-3">Cancelar</button>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
 // ── Página principal BacklogView ──────────────────────────────────────────
 export default function BacklogView() {
   const { id: projectId } = useParams();
@@ -166,7 +100,6 @@ export default function BacklogView() {
 
   const [selectedTask, setSelectedTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
 
   // Selección múltiple
@@ -236,14 +169,6 @@ export default function BacklogView() {
       const { data } = await tasksAPI.update(projectId, taskId, { status: newStatus });
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: data.status } : t));
     } catch { toast.error('Error al actualizar estado'); }
-  };
-
-  const handleQuickAdd = async (data) => {
-    try {
-      const { data: created } = await tasksAPI.create(projectId, { ...data, status: 'pending' });
-      setTasks(prev => [created, ...prev]);
-      toast.success('Tarea creada');
-    } catch (err) { toast.error(err.response?.data?.message || 'Error al crear tarea'); }
   };
 
   const handleOpenTask = async (task) => {
@@ -362,7 +287,7 @@ export default function BacklogView() {
           </span>
           {canEdit && (
             <button
-              onClick={() => { setShowQuickAdd(v => !v); }}
+              onClick={() => { setSelectedTask(null); setShowModal(true); }}
               className="btn-primary text-sm py-1.5"
             >
               <Plus className="w-4 h-4" /> Nueva Tarea
@@ -403,16 +328,7 @@ export default function BacklogView() {
             </thead>
 
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-              {/* Quick add row */}
-              {showQuickAdd && (
-                <QuickAddRow
-                  members={members}
-                  onAdd={(data) => { handleQuickAdd(data); setShowQuickAdd(false); }}
-                  onCancel={() => setShowQuickAdd(false)}
-                />
-              )}
-
-              {filtered.length === 0 && !showQuickAdd ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={COLUMNS.length + 1} className="text-center py-16">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
