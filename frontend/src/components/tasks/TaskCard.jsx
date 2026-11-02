@@ -1,5 +1,6 @@
 import { Calendar, AlertTriangle, MessageCircle, Archive } from 'lucide-react';
-import { format, isPast, parseISO, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { diaLocal, diasParaVencer, estaVencida } from '../../utils/fechas';
 import { es } from 'date-fns/locale';
 
 const priorityDot = {
@@ -10,8 +11,8 @@ const priorityLabel = {
 };
 
 export default function TaskCard({ task, onClick, onArchive }) {
-  const isOverdue = task.due_date && task.status !== 'completed' && isPast(parseISO(task.due_date));
-  const daysLeft = task.due_date ? differenceInDays(parseISO(task.due_date), new Date()) : null;
+  const isOverdue = task.due_date && task.status !== 'completed' && estaVencida(task.due_date);
+  const daysLeft = task.due_date ? diasParaVencer(task.due_date) : null;
   const isDueSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && task.status !== 'completed';
 
   return (
@@ -102,7 +103,7 @@ export default function TaskCard({ task, onClick, onArchive }) {
               isOverdue ? 'text-red-500 dark:text-red-400' : isDueSoon ? 'text-amber-500 dark:text-amber-400' : ''
             }`}>
               <Calendar className="w-3 h-3" />
-              {format(parseISO(task.due_date), 'dd MMM', { locale: es })}
+              {format(diaLocal(task.due_date), 'dd MMM', { locale: es })}
             </span>
           )}
           {task.comment_count > 0 && (

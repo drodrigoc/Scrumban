@@ -5,6 +5,7 @@ import { myTasksAPI, tasksAPI, projectsAPI } from '../services/api';
 import { CheckSquare, Circle, Clock, AlertTriangle, Filter, ExternalLink, CalendarDays, ChevronDown, ChevronRight } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import TaskModal from '../components/tasks/TaskModal';
+import { diaLocal, estaVencida } from '../utils/fechas';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Pendiente',   color: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
@@ -24,12 +25,12 @@ const GROUP_BY_STATUS = ['pending', 'in_progress', 'in_review', 'completed'];
 
 function isOverdue(due_date, status) {
   if (!due_date || status === 'completed') return false;
-  return new Date(due_date) < new Date();
+  return estaVencida(due_date);
 }
 
 function formatDate(d) {
   if (!d) return null;
-  return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  return diaLocal(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export default function MyTasks() {

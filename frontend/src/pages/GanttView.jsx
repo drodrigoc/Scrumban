@@ -10,6 +10,7 @@ import {
   addWeeks, subWeeks, startOfWeek, format,
   differenceInDays, parseISO, isBefore, isAfter
 } from 'date-fns';
+import { estaVencida } from '../utils/fechas';
 import { es } from 'date-fns/locale';
 
 const priorityColors = {
@@ -117,7 +118,7 @@ export default function GanttView() {
     const end = task.due_date
       ? parseISO(task.due_date)
       : (task.start_date ? parseISO(task.start_date) : null);
-    const isOverdue = end && isBefore(end, new Date()) && task.status !== 'completed';
+    const isOverdue = end && estaVencida(task.due_date || task.start_date) && task.status !== 'completed';
 
     let bg, border;
     if (isOverdue) {
@@ -255,7 +256,7 @@ export default function GanttView() {
 
                 {tasks.map((task, i) => {
                   const bar = getBarStyle(task);
-                  const isOverdue = task.due_date && isBefore(parseISO(task.due_date), new Date()) && task.status !== 'completed';
+                  const isOverdue = estaVencida(task.due_date) && task.status !== 'completed';
 
                   return (
                     <div key={task.id} className={`flex items-center border-b border-gray-50 dark:border-gray-800 ${
