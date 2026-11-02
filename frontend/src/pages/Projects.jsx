@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { Plus, Search, FolderKanban, Calendar, Users, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
+import { diaLocal } from '../utils/fechas';
 
 const statusConfig = {
   active:    { label: 'Activo',     color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -173,7 +174,7 @@ export default function Projects() {
                   {p.end_date && (
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {new Date(p.end_date).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
+                      {diaLocal(p.end_date).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
                     </span>
                   )}
                 </div>

@@ -11,6 +11,18 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   timezone: '+00:00',
+  // Las columnas DATE son un día del calendario, sin hora. Si llegan como
+  // Date quedan en medianoche UTC, y en El Salvador eso ya es el día anterior.
+  dateStrings: ['DATE'],
+});
+
+// La aplicación trabaja siempre en UTC, sin depender de la zona horaria
+// configurada en el servidor MySQL
+pool.on('connection', (conn) => {
+  // Este evento entrega la conexión de callbacks, no la de promesas
+  conn.query("SET time_zone = '+00:00'", (err) => {
+    if (err) console.error('❌ No se pudo fijar la zona horaria de MySQL:', err.message);
+  });
 });
 
 // Verificar conexión al iniciar

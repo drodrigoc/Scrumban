@@ -1,6 +1,7 @@
 ﻿const logger = require('../config/logger');
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
+const { hoyLocal } = require('../services/sgcCobertura');
 
 // Valores válidos de rol y formato mínimo de email
 const ROLES_VALIDOS = ['admin', 'coordinator', 'member', 'superViewer'];
@@ -196,7 +197,7 @@ exports.getStats = async (req, res) => {
         u.id, u.name, u.avatar, u.unit,
         COUNT(DISTINCT t.id) as total_tasks,
         SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
-        SUM(CASE WHEN t.status != 'completed' AND t.due_date < CURDATE() THEN 1 ELSE 0 END) as overdue_tasks
+        SUM(CASE WHEN t.status != 'completed' AND t.due_date < '${hoyLocal()}' THEN 1 ELSE 0 END) as overdue_tasks
       FROM users u
       LEFT JOIN tasks t ON t.assignee_id = u.id
       WHERE u.is_active = 1
@@ -261,7 +262,7 @@ exports.getTeamOverview = async (req, res) => {
         SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END)                           AS in_progress_tasks,
         SUM(CASE WHEN t.status = 'in_review'   THEN 1 ELSE 0 END)                           AS in_review_tasks,
         SUM(CASE WHEN t.status = 'completed'   THEN 1 ELSE 0 END)                           AS completed_tasks,
-        SUM(CASE WHEN t.status != 'completed' AND t.due_date < CURDATE() THEN 1 ELSE 0 END) AS overdue_tasks
+        SUM(CASE WHEN t.status != 'completed' AND t.due_date < '${hoyLocal()}' THEN 1 ELSE 0 END) AS overdue_tasks
       FROM users u
       LEFT JOIN tasks t ON t.assignee_id = u.id ${taskJoinFilter}
       ${memberWhere}

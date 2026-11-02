@@ -12,7 +12,8 @@ import {
 import ViewNavBar from '../components/common/ViewNavBar';
 import TaskModal from '../components/tasks/TaskModal';
 import Modal from '../components/common/Modal';
-import { format, parseISO, isPast, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { diaLocal, diasParaVencer, estaVencida } from '../utils/fechas';
 import { es } from 'date-fns/locale';
 
 // ── Configuraciones visuales ─────────────────────────────────────────────
@@ -340,8 +341,8 @@ export default function BacklogView() {
                 </tr>
               ) : filtered.map(task => {
                 const isSelected = selected.has(task.id);
-                const isOverdue = task.due_date && task.status !== 'completed' && isPast(parseISO(task.due_date));
-                const daysLeft = task.due_date ? differenceInDays(parseISO(task.due_date), new Date()) : null;
+                const isOverdue = task.due_date && task.status !== 'completed' && estaVencida(task.due_date);
+                const daysLeft = task.due_date ? diasParaVencer(task.due_date) : null;
                 const isDueSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && task.status !== 'completed';
                 const pri = priorityCfg[task.priority] || priorityCfg.medium;
 
@@ -411,7 +412,7 @@ export default function BacklogView() {
                       {task.start_date ? (
                         <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {format(parseISO(task.start_date), 'dd MMM', { locale: es })}
+                          {format(diaLocal(task.start_date), 'dd MMM', { locale: es })}
                         </span>
                       ) : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
                     </td>
@@ -425,7 +426,7 @@ export default function BacklogView() {
                           : 'text-gray-500 dark:text-gray-400'
                         }`}>
                           <Calendar className="w-3 h-3" />
-                          {format(parseISO(task.due_date), 'dd MMM', { locale: es })}
+                          {format(diaLocal(task.due_date), 'dd MMM', { locale: es })}
                           {daysLeft === 0 && ' (hoy)'}
                         </span>
                       ) : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
