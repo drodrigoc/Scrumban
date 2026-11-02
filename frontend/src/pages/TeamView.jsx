@@ -5,7 +5,8 @@ import {
   Users, Building2, CheckCircle2, Clock, AlertTriangle,
   ChevronDown, ChevronRight, Search, ListFilter,
 } from 'lucide-react';
-import { format, parseISO, isPast, isToday } from 'date-fns';
+import { format, isToday } from 'date-fns';
+import { diaLocal, estaVencida } from '../utils/fechas';
 import { es } from 'date-fns/locale';
 import { roleConfig } from './Users';
 
@@ -38,8 +39,8 @@ function StatCard({ icon: Icon, label, value, color }) {
 }
 
 function TaskRow({ task }) {
-  const due = task.due_date ? parseISO(task.due_date) : null;
-  const overdue = due && isPast(due) && task.status !== 'completed';
+  const due = task.due_date ? diaLocal(task.due_date) : null;
+  const overdue = estaVencida(task.due_date) && task.status !== 'completed';
   const dueToday = due && isToday(due) && task.status !== 'completed';
   const st = statusConfig[task.status] || statusConfig.pending;
   const pr = priorityConfig[task.priority] || priorityConfig.medium;
@@ -89,8 +90,7 @@ function MemberRow({ member }) {
   const roleInfo = roleConfig[member.role] || roleConfig.member;
   const activeTasks = member.tasks.filter(t => t.status !== 'completed');
   const overdueTasks = member.tasks.filter(t => {
-    const due = t.due_date ? parseISO(t.due_date) : null;
-    return due && isPast(due) && t.status !== 'completed';
+    return estaVencida(t.due_date) && t.status !== 'completed';
   });
 
   return (

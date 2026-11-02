@@ -1,9 +1,11 @@
 ﻿const logger = require('../config/logger');
 const db = require('../config/database');
+const { hoyLocal } = require('../services/sgcCobertura');
 
 exports.getStats = async (req, res) => {
   try {
     const userId  = req.user.id;
+    const hoy     = hoyLocal(); // CURDATE() daría la fecha en UTC
     const role    = req.user.role;
     const isAdmin      = role === 'admin' || role === 'superViewer';
     const isCoordinator = role === 'coordinator';
@@ -55,7 +57,7 @@ exports.getStats = async (req, res) => {
       ${taskWhere}
         AND t.status != 'completed'
         AND t.due_date IS NOT NULL
-        AND t.due_date < CURDATE()
+        AND t.due_date < '${hoy}'
     `);
 
     // ── Tareas próximas a vencer (7 días) ────────────────────────────────────
@@ -65,8 +67,8 @@ exports.getStats = async (req, res) => {
       ${taskWhere}
         AND t.status != 'completed'
         AND t.due_date IS NOT NULL
-        AND t.due_date >= CURDATE()
-        AND t.due_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        AND t.due_date >= '${hoy}'
+        AND t.due_date <= DATE_ADD('${hoy}', INTERVAL 7 DAY)
     `);
 
     // ── Proyectos activos con progreso ───────────────────────────────────────

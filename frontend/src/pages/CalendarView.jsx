@@ -12,6 +12,7 @@ import {
   eachDayOfInterval, format, isSameDay, isSameMonth,
   addMonths, subMonths, isToday, differenceInDays,
 } from 'date-fns';
+import { estaVencida } from '../utils/fechas';
 import { es } from 'date-fns/locale';
 
 // Paleta de colores para columnas (por índice)
@@ -64,7 +65,7 @@ function computeWeekTasks(week, tasks, colorMap) {
       const tEnd   = e ?? s;
       const col1 = Math.max(0, differenceInDays(tStart, wStart));
       const col2 = Math.min(6, differenceInDays(tEnd,   wStart));
-      const isOverdue = t.due_date && parseDate(t.due_date) < new Date() && t.status !== 'completed';
+      const isOverdue = estaVencida(t.due_date) && t.status !== 'completed';
       return {
         ...t,
         colStart:  col1 + 1,
