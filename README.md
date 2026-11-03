@@ -4,7 +4,7 @@ Sistema web completo tipo Trello/Jira con React + Node.js + MySQL.
 
 ## Requisitos previos
 
-- Node.js >= 18
+- Node.js >= 20
 - MySQL >= 8.0
 - npm >= 9
 
@@ -12,14 +12,20 @@ Sistema web completo tipo Trello/Jira con React + Node.js + MySQL.
 
 ### 1. Base de datos
 
-Abrir MySQL y ejecutar:
+Crear una base vacía y ejecutar el instalador, que crea las tablas, el usuario
+inicial y el catálogo SGC:
 
 ```sql
-mysql -u root -p < database/schema.sql
-mysql -u root -p project_manager < database/seed.sql
+CREATE DATABASE scrumban CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-O desde MySQL Workbench: importar `database/schema.sql` y luego `database/seed.sql`.
+```bash
+cd backend
+node scripts/migrate.js ../database/instalacion.sql "mysql://usuario:clave@host:3306/scrumban"
+```
+
+También se puede abrir `database/instalacion.sql` y ejecutarlo completo en
+MySQL Workbench, DBeaver o TablePlus.
 
 ### 2. Backend
 
@@ -42,16 +48,11 @@ npm run dev
 
 La app corre en `http://localhost:5173`
 
-## Credenciales de prueba
+## Usuario inicial
 
-| Rol           | Email                          | Contraseña |
-|---------------|--------------------------------|------------|
-| Administrador | admin@projectmanager.com       | password   |
-| Coordinador   | carlos@projectmanager.com      | password   |
-| Miembro       | ana@projectmanager.com         | password   |
-| Visor         | maria@projectmanager.com       | password   |
-
-> **Nota:** En producción, cambiar todas las contraseñas y el `JWT_SECRET` en `.env`.
+El instalador crea un administrador: `admin@projectflow.com` / `Admin1234`.
+Esa clave es pública: al entrar, crea tu propio administrador desde Control de
+Accesos y deshabilita este. En producción, cambia también el `JWT_SECRET` del `.env`.
 
 ## Estructura del proyecto
 
@@ -73,8 +74,7 @@ Scrumban/
 │       ├── context/AuthContext.jsx   # Estado global de auth
 │       └── services/api.js           # Cliente HTTP (axios)
 └── database/
-    ├── schema.sql                    # Crear tablas
-    └── seed.sql                      # Datos de prueba
+    └── instalacion.sql               # Tablas, usuario inicial y catálogo SGC
 ```
 
 ## Endpoints API

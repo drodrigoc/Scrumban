@@ -9,10 +9,10 @@
  *
  * Uso:
  *   # con las credenciales del .env (local)
- *   node scripts/migrate.js ../database/migration_v2.sql
+ *   node scripts/migrate.js ../database/instalacion.sql
  *
  *   # contra otra base (Railway → variable MYSQL_PUBLIC_URL del servicio)
- *   node scripts/migrate.js ../database/migration_v2.sql "mysql://usuario:clave@host:puerto/basededatos"
+ *   node scripts/migrate.js ../database/instalacion.sql "mysql://usuario:clave@host:puerto/basededatos"
  */
 
 require('dotenv').config();
@@ -52,7 +52,7 @@ async function main() {
 
   if (!archivo) {
     console.error('Falta el archivo .sql.\n' +
-      'Uso: node scripts/migrate.js ../database/migration_v2.sql ["mysql://usuario:clave@host:puerto/base"]');
+      'Uso: node scripts/migrate.js ../database/instalacion.sql ["mysql://usuario:clave@host:puerto/base"]');
     process.exit(1);
   }
 

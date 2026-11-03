@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Mueve las pruebas SGC que ya están en Drive a la estructura de cuatro
- * niveles (migración v6):
+ * niveles:
  *
  *   antes:  SGC/<dimensión>/<criterio>/<evidencia>/archivo
  *   ahora:  SGC/<dimensión>/<criterio>/<indicador>/<evidencia>/archivo
  *
- * La migración v6 solo cambia la base de datos; los archivos que ya
+ * El catálogo en cuatro niveles solo cambió la base de datos; los archivos que ya
  * estaban en Drive siguen en las carpetas viejas hasta correr esto.
  * Mueve archivos, no los copia ni los vuelve a subir.
  *

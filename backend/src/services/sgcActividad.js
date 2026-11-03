@@ -48,7 +48,7 @@ async function registrar({ accion, usuario, adjunto, taskId, projectId, evidenci
     );
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') {
-      logger.warn('Bitácora SGC: falta aplicar la migración v7 (tabla sgc_actividad)');
+      logger.warn('Bitácora SGC: la base de datos no tiene la tabla sgc_actividad');
     } else {
       logger.error(err);
     }

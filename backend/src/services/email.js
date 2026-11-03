@@ -241,10 +241,10 @@ async function procesarCola() {
       }
     }
   } catch (error) {
-    // Sin la migración v5 las tablas no existen: se avisa una sola vez en
+    // Si la base no tiene las tablas de correo, se avisa una sola vez en
     // lugar de llenar el log cada 15 segundos
     if (error.code === 'ER_NO_SUCH_TABLE') {
-      if (!avisoSinTablas) logger.warn('Correo desactivado: falta aplicar la migración v5');
+      if (!avisoSinTablas) logger.warn('Correo desactivado: la base de datos no tiene las tablas de correo');
       avisoSinTablas = true;
     } else {
       logger.error('Error procesando la cola de correos', { message: error.message });
