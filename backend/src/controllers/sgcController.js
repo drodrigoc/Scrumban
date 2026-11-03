@@ -49,7 +49,7 @@ function responderError(res, err, accion) {
     return res.status(409).json({ message: `Ya existe un registro con el código ${codigo || 'indicado'}` });
   }
   if (err.code === 'ER_NO_SUCH_TABLE' || err.code === 'ER_BAD_FIELD_ERROR') {
-    return res.status(503).json({ message: 'Falta aplicar la migración v6 en la base de datos.' });
+    return res.status(503).json({ message: 'Falta actualizar la base de datos: no existe una tabla que esta función necesita.' });
   }
   logger.error(err);
   res.status(500).json({ message: `Error al ${accion}` });
@@ -226,7 +226,7 @@ exports.getActividad = async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'ER_NO_SUCH_TABLE') {
-      return res.status(503).json({ message: 'Falta aplicar la migración v7 en la base de datos.' });
+      return res.status(503).json({ message: 'Falta actualizar la base de datos: no existe una tabla que esta función necesita.' });
     }
     responderError(res, err, 'obtener la actividad SGC');
   }

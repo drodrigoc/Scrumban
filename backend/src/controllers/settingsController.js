@@ -19,7 +19,7 @@ exports.getEmail = async (req, res) => {
   } catch (error) {
     logger.error(error);
     if (error.code === 'ER_NO_SUCH_TABLE') {
-      return res.status(503).json({ message: 'Falta aplicar la migración v5 en la base de datos.' });
+      return res.status(503).json({ message: 'Falta actualizar la base de datos: no existe una tabla que esta función necesita.' });
     }
     res.status(500).json({ message: 'No se pudo cargar la configuración de correo' });
   }
