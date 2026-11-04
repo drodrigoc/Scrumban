@@ -70,11 +70,15 @@ export const unitsAPI = {
 
 // Projects
 export const projectsAPI = {
-  getAll: () => api.get('/projects'),
+  // archivados: true → solo los proyectos archivados
+  getAll: (archivados = false) => api.get('/projects', { params: archivados ? { archivados: 1 } : {} }),
   getById: (id) => api.get(`/projects/${id}`),
   create: (data) => api.post('/projects', data),
   update: (id, data) => api.put(`/projects/${id}`, data),
-  delete: (id) => api.delete(`/projects/${id}`),
+  archive: (id) => api.patch(`/projects/${id}/archive`),
+  unarchive: (id) => api.patch(`/projects/${id}/unarchive`),
+  // confirmar: el nombre exacto del proyecto
+  delete: (id, confirmar) => api.delete(`/projects/${id}`, { data: { confirmar } }),
   addMember: (id, data) => api.post(`/projects/${id}/members`, data),
   updateMemberRole: (id, userId, role) => api.patch(`/projects/${id}/members/${userId}/role`, { role }),
   removeMember: (id, userId) => api.delete(`/projects/${id}/members/${userId}`),

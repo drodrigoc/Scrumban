@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     // Las tareas archivadas no aparecen en "Mis tareas"
     // Solo de proyectos a los que todavía tiene acceso: si lo sacaron de
     // un proyecto, sus tareas de ahí dejan de mostrarse
-    let where = `WHERE t.assignee_id = ? AND t.archived_at IS NULL
+    let where = `WHERE t.assignee_id = ? AND t.archived_at IS NULL AND p.archived_at IS NULL
                    AND (? = 'admin' OR p.owner_id = ? OR EXISTS (
                      SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = ?))`;
     const params = [req.user.id, req.user.role, req.user.id, req.user.id];

@@ -1,55 +1,61 @@
 ﻿const logger = require('../config/logger');
 const db = require('../config/database');
 const notificaciones = require('../services/notificaciones');
+const { permisosDeArchivo } = require('../middleware/auth');
+const { eliminarAdjunto } = require('./taskController');
 
 const ROLES_PROYECTO = ['coordinator', 'member', 'viewer'];
 
+// GET /api/projects            → proyectos activos
+// GET /api/projects?archivados=1 → solo los archivados
 exports.getAll = async (req, res) => {
   try {
-    let query;
-    let params = [];
+    const archivados = req.query.archivados === '1' || req.query.archivados === 'true';
+    const veTodos = ['admin', 'superViewer'].includes(req.user.role);
 
-    if (['admin', 'superViewer'].includes(req.user.role)) {
-      query = `
-        SELECT p.*, u.name as owner_name,
-          COUNT(DISTINCT t.id) as total_tasks,
-          COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
-          COUNT(DISTINCT pm.user_id) as member_count
-        FROM projects p
-        LEFT JOIN users u ON p.owner_id = u.id
-        LEFT JOIN tasks t ON t.project_id = p.id
-        LEFT JOIN project_members pm ON pm.project_id = p.id
-        GROUP BY p.id
-        ORDER BY p.updated_at DESC
-      `;
-    } else {
-      query = `
-        SELECT p.*, u.name as owner_name,
-          COUNT(DISTINCT t.id) as total_tasks,
-          COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) as completed_tasks,
-          COUNT(DISTINCT pm.user_id) as member_count
-        FROM projects p
-        LEFT JOIN users u ON p.owner_id = u.id
-        LEFT JOIN tasks t ON t.project_id = p.id
-        LEFT JOIN project_members pm ON pm.project_id = p.id
-        WHERE p.owner_id = ? OR EXISTS (
-          SELECT 1 FROM project_members pm2 WHERE pm2.project_id = p.id AND pm2.user_id = ?
-        )
-        GROUP BY p.id
-        ORDER BY p.updated_at DESC
-      `;
-      params = [req.user.id, req.user.id];
+    const condiciones = [archivados ? 'p.archived_at IS NOT NULL' : 'p.archived_at IS NULL'];
+    const params = [req.user.id];
+    if (!veTodos) {
+      // El coordinador ve además los proyectos de su unidad (la del dueño)
+      const deSuUnidad = req.user.role === 'coordinator' && req.user.unit;
+      condiciones.push(`(p.owner_id = ? OR EXISTS (
+        SELECT 1 FROM project_members pm2 WHERE pm2.project_id = p.id AND pm2.user_id = ?
+      )${deSuUnidad ? ' OR u.unit = ?' : ''})`);
+      params.push(req.user.id, req.user.id);
+      if (deSuUnidad) params.push(req.user.unit);
     }
 
-    const [projects] = await db.query(query, params);
+    const [projects] = await db.query(`
+      SELECT p.*, u.name AS owner_name, u.unit AS owner_unit,
+        ab.name AS archived_by_name,
+        (SELECT role FROM project_members WHERE project_id = p.id AND user_id = ?) AS mi_rol,
+        COUNT(DISTINCT t.id) AS total_tasks,
+        COUNT(DISTINCT CASE WHEN t.status = 'completed' THEN t.id END) AS completed_tasks,
+        COUNT(DISTINCT pm.user_id) AS member_count
+      FROM projects p
+      LEFT JOIN users u  ON p.owner_id = u.id
+      LEFT JOIN users ab ON p.archived_by = ab.id
+      LEFT JOIN tasks t ON t.project_id = p.id
+      LEFT JOIN project_members pm ON pm.project_id = p.id
+      WHERE ${condiciones.join(' AND ')}
+      GROUP BY p.id
+      ORDER BY ${archivados ? 'p.archived_at' : 'p.updated_at'} DESC
+    `, params);
 
-    // Progreso = tareas completadas / total (columna 'completed' es fija)
-    const enriched = projects.map(p => ({
-      ...p,
-      progress: p.total_tasks > 0
-        ? Math.round((p.completed_tasks / p.total_tasks) * 100)
-        : (p.progress || 0),
-    }));
+    // Progreso = tareas completadas / total (columna 'completed' es fija),
+    // y qué puede hacer quien consulta con cada proyecto
+    const enriched = projects.map(({ mi_rol, ...proyecto }) => {
+      const permisos = permisosDeArchivo(req.user, proyecto, mi_rol);
+      return {
+        ...proyecto,
+        progress: proyecto.total_tasks > 0
+          ? Math.round((proyecto.completed_tasks / proyecto.total_tasks) * 100)
+          : (proyecto.progress || 0),
+        puede_editar: !proyecto.archived_at && (req.user.role === 'admin' || proyecto.owner_id === req.user.id),
+        puede_archivar: permisos.archivar,
+        puede_eliminar: permisos.eliminar,
+      };
+    });
 
     res.json(enriched);
   } catch (error) {
@@ -92,10 +98,10 @@ exports.getById = async (req, res) => {
 
     // Qué puede hacer quien consulta, para que la interfaz no ofrezca
     // acciones que el servidor va a rechazar
-    const { lectura, escritura, gestion } = req.acceso;
+    const { lectura, escritura, gestion, archivar, eliminar } = req.acceso;
     res.json({
       ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo),
-      mi_acceso: { lectura, escritura, gestion },
+      mi_acceso: { lectura, escritura, gestion, archivar, eliminar },
     });
   } catch (error) {
     logger.error(error);
@@ -182,21 +188,85 @@ exports.update = async (req, res) => {
   }
 };
 
+// PATCH /api/projects/:id/archive — sale de la lista y queda de solo lectura
+exports.archive = async (req, res) => {
+  try {
+    if (!req.acceso.archivar) {
+      return res.status(403).json({ message: 'Solo un administrador o el coordinador de la unidad puede archivar este proyecto' });
+    }
+    if (req.acceso.archivado) return res.status(400).json({ message: 'El proyecto ya está archivado' });
+
+    await db.query('UPDATE projects SET archived_at = NOW(), archived_by = ? WHERE id = ?', [req.user.id, req.params.id]);
+    res.json({ message: 'Proyecto archivado' });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al archivar el proyecto' });
+  }
+};
+
+// PATCH /api/projects/:id/unarchive — vuelve a la lista con todo lo que tenía
+exports.unarchive = async (req, res) => {
+  try {
+    if (!req.acceso.archivar) {
+      return res.status(403).json({ message: 'Solo un administrador o el coordinador de la unidad puede restaurar este proyecto' });
+    }
+    if (!req.acceso.archivado) return res.status(400).json({ message: 'El proyecto no está archivado' });
+
+    await db.query('UPDATE projects SET archived_at = NULL, archived_by = NULL WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Proyecto restaurado' });
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ message: 'Error al restaurar el proyecto' });
+  }
+};
+
+// DELETE /api/projects/:id   body: { confirmar: "<nombre exacto del proyecto>" }
+//
+// Borrar un proyecto arrastra sus tareas, comentarios, historial,
+// presupuesto y fases, y no se puede deshacer. Por eso:
+//   - solo el administrador o el coordinador de la unidad
+//   - solo si ya está archivado
+//   - hay que escribir su nombre para confirmar
+//   - si tiene pruebas SGC no se elimina: son evidencia de acreditación
+//   - sus archivos van a la papelera de Drive (o se borran del disco), para
+//     que no queden huérfanos
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;
-    const [projects] = await db.query('SELECT owner_id FROM projects WHERE id = ?', [id]);
-
-    if (!projects.length) return res.status(404).json({ message: 'Proyecto no encontrado' });
-    if (req.user.role !== 'admin' && projects[0].owner_id !== req.user.id) {
-      return res.status(403).json({ message: 'Solo el dueño o admin puede eliminar el proyecto' });
+    if (!req.acceso.archivar) {
+      return res.status(403).json({ message: 'Solo un administrador o el coordinador de la unidad puede eliminar este proyecto' });
+    }
+    if (!req.acceso.archivado) {
+      return res.status(400).json({ message: 'Primero archiva el proyecto: solo se eliminan proyectos archivados' });
     }
 
+    const [[proyecto]] = await db.query('SELECT name FROM projects WHERE id = ?', [id]);
+    if (String(req.body?.confirmar ?? '').trim() !== proyecto.name.trim()) {
+      return res.status(400).json({ message: 'Escribe el nombre exacto del proyecto para confirmar' });
+    }
+
+    const [[{ pruebas }]] = await db.query(
+      `SELECT COUNT(*) AS pruebas FROM task_attachments ta JOIN tasks t ON t.id = ta.task_id
+        WHERE t.project_id = ? AND ta.category = 'sgc'`, [id]
+    );
+    if (Number(pruebas)) {
+      return res.status(409).json({
+        message: `El proyecto tiene ${pruebas} prueba(s) SGC. Las evidencias de acreditación no se eliminan: déjalo archivado.`,
+      });
+    }
+
+    // Primero los archivos: si Drive falla, el proyecto queda intacto
+    const [adjuntos] = await db.query(
+      'SELECT ta.* FROM task_attachments ta JOIN tasks t ON t.id = ta.task_id WHERE t.project_id = ?', [id]
+    );
+    for (const adjunto of adjuntos) await eliminarAdjunto(adjunto);
+
     await db.query('DELETE FROM projects WHERE id = ?', [id]);
-    res.json({ message: 'Proyecto eliminado' });
+    logger.info('Proyecto eliminado', { projectId: Number(id), nombre: proyecto.name, archivos: adjuntos.length, userId: req.user.id });
+    res.json({ message: 'Proyecto eliminado', archivos: adjuntos.length });
   } catch (error) {
     logger.error(error);
-    res.status(500).json({ message: 'Error al eliminar proyecto' });
+    res.status(500).json({ message: 'Error al eliminar el proyecto. Si tenía archivos, algunos pudieron quedar en la papelera.' });
   }
 };
 

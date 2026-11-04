@@ -225,9 +225,10 @@ exports.getTeamOverview = async (req, res) => {
     //
     // "Visible projects" for a coordinator = projects they own OR are a member of.
     const visibleProjectsSql = `
-      SELECT id FROM projects WHERE owner_id = ${coordId}
+      SELECT id FROM projects WHERE owner_id = ${coordId} AND archived_at IS NULL
       UNION
-      SELECT project_id FROM project_members WHERE user_id = ${coordId}
+      SELECT pm.project_id FROM project_members pm JOIN projects pr ON pr.id = pm.project_id
+       WHERE pm.user_id = ${coordId} AND pr.archived_at IS NULL
     `;
 
     // "Visible members" for a coordinator = users from their unit

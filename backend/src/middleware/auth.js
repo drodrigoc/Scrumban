@@ -62,11 +62,38 @@ const authorize = (...roles) => {
 //
 // Antes solo se bloqueaba a los visores, así que quien no era miembro
 // pasaba como si lo fuera.
-async function accesoAProyecto(user, projectId) {
-  const [[proyecto]] = await db.query('SELECT owner_id FROM projects WHERE id = ?', [projectId]);
-  if (!proyecto) return null;
+//
+// Un proyecto archivado queda de solo lectura para todos: se consulta, pero
+// no se modifica hasta restaurarlo.
+//
+// Archivar, restaurar y eliminar un proyecto: el administrador, en todos; el
+// coordinador (rol general), en los de su unidad. La unidad de un proyecto es
+// la de su dueño, y también cuentan los que el coordinador es dueño o
+// coordina. Eliminar exige además que el proyecto ya esté archivado.
 
-  if (user.role === 'admin') return { lectura: true, escritura: true, gestion: true };
+/**
+ * @param {object} user     req.user
+ * @param {object} proyecto { owner_id, owner_unit, archived_at }
+ * @param {string|null} rol rol del usuario en el proyecto (project_members)
+ */
+function permisosDeArchivo(user, proyecto, rol) {
+  const esCoordinador = user.role === 'coordinator' && (
+    proyecto.owner_id === user.id ||
+    rol === 'coordinator' ||
+    (Boolean(user.unit) && proyecto.owner_unit === user.unit)
+  );
+  const archivar = user.role === 'admin' || esCoordinador;
+  return { archivar, eliminar: archivar && Boolean(proyecto.archived_at) };
+}
+
+async function accesoAProyecto(user, projectId) {
+  const [[proyecto]] = await db.query(
+    `SELECT p.owner_id, p.archived_at, u.unit AS owner_unit
+       FROM projects p LEFT JOIN users u ON u.id = p.owner_id
+      WHERE p.id = ?`,
+    [projectId]
+  );
+  if (!proyecto) return null;
 
   const [[miembro]] = await db.query(
     'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
@@ -74,12 +101,20 @@ async function accesoAProyecto(user, projectId) {
   );
   const esDueno = proyecto.owner_id === user.id;
   const rol = miembro?.role || null;
+  const archivado = Boolean(proyecto.archived_at);
 
-  const gestion = esDueno || rol === 'coordinator' || (user.role === 'coordinator' && Boolean(rol));
+  const permisos = permisosDeArchivo(user, proyecto, rol);
+  // El coordinador de la unidad ve sus proyectos aunque no sea miembro
+  const lectura = user.role === 'admin' || esDueno || Boolean(rol) || user.role === 'superViewer' || permisos.archivar;
+  const gestion = user.role === 'admin' || esDueno || rol === 'coordinator' || (user.role === 'coordinator' && Boolean(rol));
+  const escritura = gestion || (Boolean(rol) && rol !== 'viewer');
+
   return {
-    lectura:   esDueno || Boolean(rol) || user.role === 'superViewer',
-    escritura: gestion || (Boolean(rol) && rol !== 'viewer'),
-    gestion,
+    lectura,
+    escritura: escritura && !archivado,
+    gestion:   gestion && !archivado,
+    archivado,
+    ...permisos,
   };
 }
 
@@ -107,7 +142,12 @@ const requireProjectAccess = (nivel) => async (req, res, next) => {
       req.acceso = { ...acceso, projectId };
     }
 
-    if (!req.acceso[nivel]) return res.status(403).json({ message: MENSAJES_ACCESO[nivel] });
+    if (!req.acceso[nivel]) {
+      const message = req.acceso.archivado && req.acceso.lectura
+        ? 'El proyecto está archivado: restáuralo para modificarlo'
+        : MENSAJES_ACCESO[nivel];
+      return res.status(403).json({ message });
+    }
     next();
   } catch (error) {
     next(error);
@@ -145,5 +185,5 @@ const authorizeSGC = (req, res, next) => {
 
 module.exports = {
   authenticate, authorize, authorizeSGC,
-  accesoAProyecto, requireProjectAccess, requireTaskInProject,
+  accesoAProyecto, permisosDeArchivo, requireProjectAccess, requireTaskInProject,
 };

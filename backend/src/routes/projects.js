@@ -17,8 +17,11 @@ router.post('/', ctrl.create);
 
 router.get('/:id', lectura, ctrl.getById);
 router.put('/:id', gestion, ctrl.update);
-// Eliminar: solo el dueño o un admin (lo decide el controlador)
-router.delete('/:id', lectura, ctrl.delete);
+// Archivar, restaurar y eliminar: administrador o coordinador de la unidad
+// (lo decide el controlador con req.acceso)
+router.patch('/:id/archive',   lectura, ctrl.archive);
+router.patch('/:id/unarchive', lectura, ctrl.unarchive);
+router.delete('/:id',          lectura, ctrl.delete);
 
 router.post('/:id/members', gestion, ctrl.addMember);
 router.patch('/:id/members/:userId/role', gestion, ctrl.updateMemberRole);

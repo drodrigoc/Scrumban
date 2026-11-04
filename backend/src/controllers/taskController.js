@@ -609,6 +609,9 @@ async function eliminarAdjunto(attachment) {
   await db.query('DELETE FROM task_attachments WHERE id = ?', [attachment.id]);
 }
 
+// También lo usa la eliminación de proyectos
+exports.eliminarAdjunto = eliminarAdjunto;
+
 exports.uploadAttachment = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No se proporcionó archivo' });

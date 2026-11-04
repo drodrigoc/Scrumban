@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { projectsAPI, usersAPI, unitsAPI } from '../services/api';
-import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArrowLeft, Edit, Users, Plus, Trash2, Building2, DollarSign, UserCog } from 'lucide-react';
+import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, DollarSign, UserCog } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import BudgetPanel from '../components/projects/BudgetPanel';
 import PhasesPanel from '../components/projects/PhasesPanel';
 import { useAuth } from '../context/AuthContext';
+import { useArchivoProyecto } from '../components/projects/AccionesArchivo';
 
 const statusConfig = {
   active:    { label: 'Activo',     color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -34,6 +35,14 @@ export default function ProjectDetail() {
       .catch(() => { toast.error('Error al cargar proyecto'); navigate('/projects'); })
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Tras archivar o restaurar se recarga: cambia lo que se puede hacer
+  const recargar = () => projectsAPI.getById(id).then(({ data }) => setProject(data)).catch(() => {});
+  const archivo = useArchivoProyecto({
+    onArchivado: recargar,
+    onRestaurado: recargar,
+    onEliminado: () => navigate('/projects'),
+  });
 
   const handleUpdate = async (data) => {
     try {
@@ -130,6 +139,21 @@ export default function ProjectDetail() {
           </button>
         )}
       </div>
+
+      {project.archived_at && (
+        <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20">
+          <Archive className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="flex-1 text-sm text-amber-800 dark:text-amber-300">
+            Proyecto archivado el {new Date(project.archived_at).toLocaleDateString('es-SV', { day: 'numeric', month: 'long', year: 'numeric' })}.
+            Se puede consultar, pero no modificar.
+          </p>
+          {project.mi_acceso?.archivar && (
+            <button onClick={() => archivo.restaurar(project)} className="btn-secondary text-sm py-1.5">
+              <ArchiveRestore className="w-4 h-4" /> Restaurar
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -291,6 +315,29 @@ export default function ProjectDetail() {
           ))}
         </div>
       </div>
+
+      {project.mi_acceso?.archivar && (
+        <div className="card p-5 border-red-200 dark:border-red-900/50">
+          <h2 className="font-semibold text-red-600 dark:text-red-400 mb-1">Zona de peligro</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Archivar saca el proyecto de la lista y lo deja de solo lectura; se puede restaurar.
+            Eliminar es definitivo y solo se permite con proyectos archivados y sin pruebas SGC.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {!project.archived_at ? (
+              <button onClick={() => archivo.archivar(project)} className="btn-secondary text-sm">
+                <Archive className="w-4 h-4" /> Archivar proyecto
+              </button>
+            ) : (
+              <button onClick={() => archivo.eliminar(project)} className="btn-danger text-sm">
+                <Trash2 className="w-4 h-4" /> Eliminar proyecto
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {archivo.modal}
 
       {showEditModal && (
         <Modal title="Editar Proyecto" onClose={() => setShowEditModal(false)}>
