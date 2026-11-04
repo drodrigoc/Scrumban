@@ -60,9 +60,12 @@ CREATE TABLE projects (
   gdrive_folder_id VARCHAR(255) DEFAULT NULL,
   color       VARCHAR(7) DEFAULT '#3B82F6',
   presupuesto DECIMAL(14,2) DEFAULT NULL,
+  archived_at DATETIME DEFAULT NULL,
+  archived_by INT DEFAULT NULL,
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (owner_id)    REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (archived_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- 4. Miembros de proyecto
@@ -379,6 +382,7 @@ CREATE INDEX idx_checklist_task       ON task_checklist_items(task_id);
 CREATE INDEX idx_units_name           ON units(name);
 CREATE INDEX idx_budget_project       ON project_budget_items(project_id, tipo);
 CREATE INDEX idx_phases_project       ON project_phases(project_id, position);
+CREATE INDEX idx_projects_archived     ON projects(archived_at);
 CREATE INDEX idx_attachments_storage   ON task_attachments(storage_provider);
 CREATE INDEX idx_attachments_evidencia ON task_attachments(evidencia_id);
 

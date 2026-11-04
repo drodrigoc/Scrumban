@@ -13,23 +13,25 @@ exports.getStats = async (req, res) => {
     const isMember     = !isAdmin && !isCoordinator;
 
     // ── Filtros ──────────────────────────────────────────────────────────────
+    // Los proyectos archivados no cuentan en el panel
     const projectWhere = isAdmin
-      ? 'WHERE 1=1'
-      : `WHERE (p.owner_id = ${userId} OR EXISTS (
+      ? 'WHERE p.archived_at IS NULL'
+      : `WHERE p.archived_at IS NULL AND (p.owner_id = ${userId} OR EXISTS (
             SELECT 1 FROM project_members pm
             WHERE pm.project_id = p.id AND pm.user_id = ${userId}
          ))`;
 
     // Sub-select reutilizable de proyectos visibles por el usuario
     const visibleProjects = isAdmin
-      ? 'SELECT id FROM projects'
-      : `SELECT id FROM projects WHERE owner_id = ${userId}
+      ? 'SELECT id FROM projects WHERE archived_at IS NULL'
+      : `SELECT id FROM projects WHERE owner_id = ${userId} AND archived_at IS NULL
          UNION
-         SELECT project_id FROM project_members WHERE user_id = ${userId}`;
+         SELECT pm.project_id FROM project_members pm JOIN projects pr ON pr.id = pm.project_id
+          WHERE pm.user_id = ${userId} AND pr.archived_at IS NULL`;
 
     // Members: solo sus tareas asignadas
     const taskWhere = isAdmin
-      ? 'WHERE 1=1'
+      ? `WHERE t.project_id IN (${visibleProjects})`
       : isMember
         ? `WHERE t.project_id IN (${visibleProjects}) AND t.assignee_id = ${userId}`
         : `WHERE t.project_id IN (${visibleProjects})`;
