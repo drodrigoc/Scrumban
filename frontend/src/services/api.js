@@ -115,6 +115,7 @@ export const projectsAPI = {
   delete: (id, confirmar) => api.delete(`/projects/${id}`, { data: { confirmar } }),
   addMember: (id, data) => api.post(`/projects/${id}/members`, data),
   updateMemberRole: (id, userId, role) => api.patch(`/projects/${id}/members/${userId}/role`, { role }),
+  delegarCostosFijos: (id, userId, habilitado) => api.patch(`/projects/${id}/members/${userId}/costos-fijos`, { habilitado }),
   removeMember: (id, userId) => api.delete(`/projects/${id}/members/${userId}`),
   getLabels: (id) => api.get(`/projects/${id}/labels`),
   createLabel: (id, data) => api.post(`/projects/${id}/labels`, data),

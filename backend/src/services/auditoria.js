@@ -35,6 +35,8 @@ const ACCIONES = {
   miembro_agregado:           { categoria: 'proyectos',     etiqueta: 'Miembro agregado' },
   miembro_quitado:            { categoria: 'proyectos',     etiqueta: 'Miembro quitado' },
   rol_miembro_cambiado:       { categoria: 'proyectos',     etiqueta: 'Rol de miembro cambiado' },
+  costos_fijos_delegados:     { categoria: 'proyectos',     etiqueta: 'Costos fijos delegados a un coordinador' },
+  costos_fijos_retirados:     { categoria: 'proyectos',     etiqueta: 'Costos fijos retirados a un coordinador' },
   pei_vinculada:              { categoria: 'proyectos',     etiqueta: 'Actividad estratégica vinculada' },
   pei_desvinculada:           { categoria: 'proyectos',     etiqueta: 'Actividad estratégica desvinculada' },
   pei_cumplida:               { categoria: 'proyectos',     etiqueta: 'Actividad estratégica cumplida' },

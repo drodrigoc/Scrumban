@@ -4,6 +4,13 @@ const { MENSAJE_BLOQUEO } = require('../middleware/auth');
 
 const TIPOS = ['fijo', 'variable'];
 
+// Los costos fijos (salarios, prestaciones) son información reservada: los
+// ven el administrador, el coordinador y el Super Visor del sistema, y el
+// coordinador del proyecto al que se le delegaron. Lo calcula
+// middleware/auth.js (req.acceso.costosFijos).
+const veFijos = (req) => Boolean(req.acceso?.costosFijos);
+const MENSAJE_FIJOS = 'Los costos fijos solo los manejan la coordinación del sistema y la administración';
+
 const toNumber = (v) => {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : 0;
@@ -99,7 +106,11 @@ exports.getAll = async (req, res) => {
         ORDER BY b.tipo ASC, b.categoria ASC, b.id ASC`,
       [id]
     );
-    res.json(calcular(items, await tareasConCosto(id)));
+    // Sin permiso, los fijos no se envían ni cuentan en los totales: con el
+    // total completo se podría deducir cuánto suman los salarios
+    const ver = veFijos(req);
+    const visibles = ver ? items : items.filter(i => i.tipo !== 'fijo');
+    res.json({ ...calcular(visibles, await tareasConCosto(id)), fijos_ocultos: !ver });
   } catch (error) {
     if (error.code === 'ER_BAD_FIELD_ERROR') {
       return res.status(503).json({
@@ -134,7 +145,10 @@ exports.create = async (req, res) => {
     if (tipo && !TIPOS.includes(tipo)) {
       return res.status(400).json({ message: 'El tipo debe ser "fijo" o "variable"' });
     }
-    const tipoFinal = tipo || 'fijo';
+    const tipoFinal = tipo || (veFijos(req) ? 'fijo' : 'variable');
+    if (tipoFinal === 'fijo' && !veFijos(req)) {
+      return res.status(403).json({ message: MENSAJE_FIJOS });
+    }
 
     const [result] = await db.query(
       `INSERT INTO project_budget_items
@@ -178,6 +192,9 @@ exports.update = async (req, res) => {
       [itemId, id]
     );
     if (!actual) return res.status(404).json({ message: 'Partida no encontrada' });
+    if ((actual.tipo === 'fijo' || tipo === 'fijo') && !veFijos(req)) {
+      return res.status(403).json({ message: MENSAJE_FIJOS });
+    }
 
     // Planificación POA bloqueada: solo se registra el ejecutado de las
     // partidas fijas (salarios que se pagan cada mes); lo demás es plan
@@ -233,6 +250,12 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     const { id, itemId } = req.params;
+    const [[partida]] = await db.query(
+      'SELECT tipo FROM project_budget_items WHERE id = ? AND project_id = ?', [itemId, id]
+    );
+    if (partida?.tipo === 'fijo' && !veFijos(req)) {
+      return res.status(403).json({ message: MENSAJE_FIJOS });
+    }
     const [result] = await db.query(
       'DELETE FROM project_budget_items WHERE id = ? AND project_id = ?',
       [itemId, id]

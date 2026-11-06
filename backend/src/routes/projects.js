@@ -30,6 +30,9 @@ router.delete('/:id',          lectura, ctrl.delete);
 router.post('/:id/members', gestion, ctrl.addMember);
 router.patch('/:id/members/:userId/role', gestion, ctrl.updateMemberRole);
 router.delete('/:id/members/:userId', gestion, ctrl.removeMember);
+// Delegar los costos fijos a un coordinador del proyecto (el controlador
+// exige además administrador o coordinador del sistema)
+router.patch('/:id/members/:userId/costos-fijos', gestion, ctrl.delegarCostosFijos);
 
 router.get('/:id/labels', lectura, ctrl.getLabels);
 router.post('/:id/labels', escritura, ctrl.createLabel);
