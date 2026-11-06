@@ -50,6 +50,34 @@ async function validarFaseYResponsable(projectId, { phase_id, assignee_id }) {
   return null;
 }
 
+/**
+ * La partida del costo tiene que ser una partida VARIABLE del mismo
+ * proyecto: el ejecutado de las fijas se escribe a mano y no suma tareas.
+ * Devuelve { error } o { partida } (con su nombre, para el historial).
+ */
+async function validarPartida(projectId, budgetItemId) {
+  if (!budgetItemId) return { partida: null };
+  const [[partida]] = await db.query(
+    'SELECT id, tipo, categoria FROM project_budget_items WHERE id = ? AND project_id = ?',
+    [budgetItemId, projectId]
+  );
+  if (!partida) return { error: 'La partida no pertenece a este proyecto' };
+  if (partida.tipo !== 'variable') {
+    return { error: 'Solo se pueden asignar tareas a partidas variables' };
+  }
+  return { partida };
+}
+
+const nombrePartida = async (budgetItemId) => {
+  if (!budgetItemId) return 'Sin partida';
+  const [[p]] = await db.query('SELECT categoria FROM project_budget_items WHERE id = ?', [budgetItemId]);
+  return p?.categoria || 'Sin partida';
+};
+
+const dinero = (v) => (v == null || v === ''
+  ? 'sin costo'
+  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(v)));
+
 exports.getByProject = async (req, res) => {
   try {
     const { project_id } = req.params;
@@ -185,12 +213,15 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { project_id } = req.params;
-    const { title, description, assignee_id, start_date, due_date, priority, status, label_ids, sgc_ids, costo, phase_id } = req.body;
+    const { title, description, assignee_id, start_date, due_date, priority, status, label_ids, sgc_ids, costo, phase_id, budget_item_id } = req.body;
 
     if (!title) return res.status(400).json({ message: 'El título es requerido' });
 
     const invalido = await validarFaseYResponsable(project_id, { phase_id, assignee_id });
     if (invalido) return res.status(400).json({ message: invalido });
+
+    const partida = await validarPartida(project_id, budget_item_id);
+    if (partida.error) return res.status(400).json({ message: partida.error });
 
     const [maxPos] = await db.query(
       'SELECT MAX(position) as max FROM tasks WHERE project_id = ? AND status = ?',
@@ -202,11 +233,11 @@ exports.create = async (req, res) => {
     const completedAt = (status || 'pending') === 'completed' ? new Date() : null;
 
     const [result] = await db.query(
-      `INSERT INTO tasks (project_id, title, description, assignee_id, start_date, due_date, priority, status, position, created_by, costo, phase_id, completed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tasks (project_id, title, description, assignee_id, start_date, due_date, priority, status, position, created_by, costo, phase_id, budget_item_id, completed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [project_id, title, description, assignee_id || null, start_date || null, due_date || null,
        priority || 'medium', status || 'pending', position, req.user.id, costo || null,
-       phase_id || null, completedAt]
+       phase_id || null, partida.partida?.id || null, completedAt]
     );
 
     const taskId = result.insertId;
@@ -232,7 +263,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, assignee_id, start_date, due_date, priority, status, position, progress, label_ids, sgc_ids, costo, phase_id } = req.body;
+    const { title, description, assignee_id, start_date, due_date, priority, status, position, progress, label_ids, sgc_ids, costo, phase_id, budget_item_id } = req.body;
 
     const [current] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
     if (!current.length) return res.status(404).json({ message: 'Tarea no encontrada' });
@@ -246,6 +277,14 @@ exports.update = async (req, res) => {
       assignee_id: assignee_id && Number(assignee_id) !== task.assignee_id ? assignee_id : null,
     });
     if (invalido) return res.status(400).json({ message: invalido });
+
+    // Igual que la fase: solo se valida si cambia
+    const nuevaPartida = budget_item_id === undefined ? undefined : (Number(budget_item_id) || null);
+    const cambiaPartida = nuevaPartida !== undefined && nuevaPartida !== task.budget_item_id;
+    if (cambiaPartida) {
+      const { error } = await validarPartida(task.project_id, nuevaPartida);
+      if (error) return res.status(400).json({ message: error });
+    }
 
     const fields = [];
     const values = [];
@@ -295,7 +334,22 @@ exports.update = async (req, res) => {
     }
     if (position !== undefined) { fields.push('position = ?'); values.push(position); }
     if (progress !== undefined) { fields.push('progress = ?'); values.push(progress); }
-    if (costo !== undefined) { fields.push('costo = ?'); values.push(costo || null); }
+    if (costo !== undefined) {
+      const nuevoCosto = costo || null;
+      fields.push('costo = ?'); values.push(nuevoCosto);
+      // El costo mueve el ejecutado del presupuesto: queda en el historial
+      if (Number(nuevoCosto || 0) !== Number(task.costo || 0)) {
+        changes.push({ field: 'costo', old: dinero(task.costo), new: dinero(nuevoCosto) });
+      }
+    }
+    if (cambiaPartida) {
+      fields.push('budget_item_id = ?'); values.push(nuevaPartida);
+      changes.push({
+        field: 'partida',
+        old: await nombrePartida(task.budget_item_id),
+        new: await nombrePartida(nuevaPartida),
+      });
+    }
     if (phase_id !== undefined) {
       fields.push('phase_id = ?'); values.push(phase_id || null);
       if ((phase_id || null) !== task.phase_id) {

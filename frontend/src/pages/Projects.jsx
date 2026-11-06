@@ -64,7 +64,12 @@ export default function Projects() {
       setShowModal(false);
       setEditing(null);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al guardar');
+      // Si el servidor dice qué campo corregir, el formulario lo muestra
+      // junto al campo; si no, se avisa aquí
+      if (!err.response?.data?.campo) {
+        toast.error(err.response?.data?.message || 'No se pudo guardar el proyecto. Intenta de nuevo.');
+      }
+      throw err;
     }
   };
 

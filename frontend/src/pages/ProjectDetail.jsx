@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { projectsAPI, usersAPI, unitsAPI } from '../services/api';
-import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, DollarSign, UserCog } from 'lucide-react';
+import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, UserCog } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import BudgetPanel from '../components/projects/BudgetPanel';
@@ -50,7 +50,12 @@ export default function ProjectDetail() {
       setProject(prev => ({ ...prev, ...updated }));
       setShowEditModal(false);
       toast.success('Proyecto actualizado');
-    } catch { toast.error('Error al actualizar'); }
+    } catch (err) {
+      if (!err.response?.data?.campo) {
+        toast.error(err.response?.data?.message || 'No se pudo actualizar el proyecto. Intenta de nuevo.');
+      }
+      throw err; // el formulario muestra el error junto al campo
+    }
   };
 
   const handleAddMember = async (userId, role) => {
@@ -99,12 +104,6 @@ export default function ProjectDetail() {
   // Editar el proyecto, sus miembros, presupuesto y fases: lo decide el
   // servidor según el rol en el proyecto (mi_acceso.gestion)
   const canEdit = Boolean(project.mi_acceso?.gestion);
-
-  const presupuesto  = project.presupuesto  != null ? parseFloat(project.presupuesto)  : null;
-  const totalCosto   = project.total_costo  != null ? parseFloat(project.total_costo)  : 0;
-  const disponible   = presupuesto != null ? presupuesto - totalCosto : null;
-  const budgetPct    = presupuesto > 0 ? Math.min(100, Math.round((totalCosto / presupuesto) * 100)) : 0;
-  const fmt          = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
   const views = [
     { to: `/projects/${id}/backlog`,   icon: List,             label: 'Backlog' },
@@ -176,52 +175,6 @@ export default function ProjectDetail() {
         ))}
       </div>
 
-      {/* Financial Summary */}
-      {(presupuesto != null || totalCosto > 0) && (
-        <div className="card p-5">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-4">
-            <DollarSign className="w-4 h-4 text-green-500" />
-            Control de Gastos
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            {presupuesto != null && (
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Presupuesto</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{fmt(presupuesto)}</p>
-              </div>
-            )}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Gastado</p>
-              <p className={`text-lg font-bold ${disponible != null && disponible < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                {fmt(totalCosto)}
-              </p>
-            </div>
-            {disponible != null && (
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Disponible</p>
-                <p className={`text-lg font-bold ${disponible < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                  {fmt(disponible)}
-                </p>
-              </div>
-            )}
-          </div>
-          {presupuesto != null && presupuesto > 0 && (
-            <div>
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                <span>Ejecución presupuestaria</span>
-                <span className={budgetPct >= 100 ? 'text-red-500 font-semibold' : ''}>{budgetPct}%</span>
-              </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${budgetPct >= 100 ? 'bg-red-500' : budgetPct >= 80 ? 'bg-amber-500' : 'bg-green-500'}`}
-                  style={{ width: `${budgetPct}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Views */}
       <div>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Vistas</h2>
@@ -248,7 +201,8 @@ export default function ProjectDetail() {
         projectEnd={project.end_date}
       />
 
-      {/* Presupuesto por partidas */}
+      {/* Presupuesto: partidas, ejecutado y disponible (reemplaza al antiguo
+          "Control de Gastos", que usaba un monto escrito al crear el proyecto) */}
       <BudgetPanel projectId={id} canEdit={canEdit} />
 
       {/* Members */}
