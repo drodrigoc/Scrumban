@@ -41,13 +41,29 @@ const errorTransport = new DailyRotateFile({
   level:        'error',
 });
 
+// ── Transporte: peticiones HTTP (solo las líneas de nivel "http") ───────────
+// Están aparte para que el archivo combinado siga siendo legible
+const soloHttp = format((info) => (info.level === 'http' ? info : false));
+const httpTransport = new DailyRotateFile({
+  filename:     path.join(LOGS_DIR, 'http-%DATE%.log'),
+  datePattern:  'YYYY-MM-DD',
+  maxSize:      '20m',
+  maxFiles:     '14d',
+  format:       format.combine(soloHttp(), fileFormat),
+  level:        'http',
+});
+
 // ── Logger principal ───────────────────────────────────────────────────────
+// El logger acepta hasta "http"; cada transporte decide qué guarda. La
+// consola sigue en LOG_LEVEL (info) para que los logs de PM2 no se llenen
+// con cada petición.
 const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: 'http',
   transports: [
     combinedTransport,
     errorTransport,
-    new transports.Console({ format: consoleFormat }),
+    httpTransport,
+    new transports.Console({ format: consoleFormat, level: process.env.LOG_LEVEL || 'info' }),
   ],
   // No detener el proceso ante excepciones no capturadas
   exitOnError: false,

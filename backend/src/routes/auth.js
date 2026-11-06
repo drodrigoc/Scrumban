@@ -9,5 +9,6 @@ router.post('/login', limiteLoginIP, limiteLoginCorreo, limiteLoginCuenta, ctrl.
 router.post('/forgot-password', limiteRecuperacion, ctrl.forgotPassword);
 router.post('/reset-password', limiteRestablecer, ctrl.resetPassword);
 router.get('/me', authenticate, ctrl.getMe);
+router.post('/logout', authenticate, ctrl.logout);
 
 module.exports = router;

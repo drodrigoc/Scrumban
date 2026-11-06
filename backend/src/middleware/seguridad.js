@@ -27,8 +27,10 @@ function cabecerasSeguridad(req, res, next) {
  * @param {number}   o.maximo
  * @param {Function} o.clave     (req) => string
  * @param {string}   o.mensaje
+ * @param {Function} [o.alBloquear]  (req) => void — se llama una sola vez,
+ *                                   en el primer intento rechazado de la ventana
  */
-function limitarIntentos({ ventanaMs, maximo, clave, mensaje }) {
+function limitarIntentos({ ventanaMs, maximo, clave, mensaje, alBloquear }) {
   const registros = new Map(); // clave → { cuenta, vence }
 
   // Limpieza periódica para que el mapa no crezca sin fin
@@ -48,6 +50,7 @@ function limitarIntentos({ ventanaMs, maximo, clave, mensaje }) {
 
     registro.cuenta++;
     if (registro.cuenta > maximo) {
+      if (registro.cuenta === maximo + 1 && alBloquear) alBloquear(req);
       const segundos = Math.ceil((registro.vence - ahora) / 1000);
       res.setHeader('Retry-After', String(segundos));
       return res.status(429).json({
@@ -59,6 +62,15 @@ function limitarIntentos({ ventanaMs, maximo, clave, mensaje }) {
 }
 
 const correoDe = (req) => String(req.body?.email || '').toLowerCase().trim();
+
+// Deja constancia en la auditoría de que alguien quedó bloqueado. Se
+// requiere aquí dentro para que este módulo no cargue la base de datos
+const auditarBloqueo = (detalle) => (req) => {
+  require('../services/auditoria').registrar(req, {
+    accion: 'login_bloqueado', resultado: 'fallo',
+    correo: correoDe(req) || null, detalle,
+  });
+};
 const QUINCE_MIN = 15 * 60 * 1000;
 const UNA_HORA   = 60 * 60 * 1000;
 
@@ -68,6 +80,7 @@ const limiteLoginCuenta = limitarIntentos({
   ventanaMs: QUINCE_MIN, maximo: 10,
   clave: (req) => `${req.ip}|${correoDe(req)}`,
   mensaje: 'Demasiados intentos de inicio de sesión.',
+  alBloquear: auditarBloqueo('Más de 10 intentos en 15 minutos desde la misma red con este correo'),
 });
 // Tope por correo desde cualquier IP. Es más alto para que un tercero no
 // pueda bloquear fácilmente la cuenta de otra persona
@@ -75,11 +88,13 @@ const limiteLoginCorreo = limitarIntentos({
   ventanaMs: QUINCE_MIN, maximo: 30,
   clave: (req) => `correo|${correoDe(req)}`,
   mensaje: 'Demasiados intentos de inicio de sesión para esta cuenta.',
+  alBloquear: auditarBloqueo('Más de 30 intentos en 15 minutos con este correo'),
 });
 const limiteLoginIP = limitarIntentos({
   ventanaMs: QUINCE_MIN, maximo: 50,
   clave: (req) => req.ip,
   mensaje: 'Demasiados intentos de inicio de sesión desde esta red.',
+  alBloquear: auditarBloqueo('Más de 50 intentos en 15 minutos desde esta red'),
 });
 
 // Recuperación: cada pedido manda un correo

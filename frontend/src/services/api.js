@@ -36,6 +36,16 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data) => api.post('/auth/reset-password', data),
+  // Se envía el token explícito: el navegador lo borra justo después
+  // (cuerpo {} y no null: express.json rechaza un null)
+  logout: (token) => api.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } }),
+};
+
+// Auditoría (solo administradores)
+// filtros: { usuario, correo, categoria, accion, resultado, desde, hasta, q, pagina }
+export const auditoriaAPI = {
+  listar:       (params) => api.get('/auditoria', { params }),
+  descargarCsv: (params) => api.get('/auditoria/export.csv', { params, responseType: 'blob' }),
 };
 
 // Configuración del sistema (solo administradores)
