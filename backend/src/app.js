@@ -30,11 +30,13 @@ app.use(cors({
   },
   credentials: true,
 }));
+// ── HTTP request logging ──────────────────────────────────────────────────
+// Antes de leer el cuerpo: así también quedan registradas las peticiones
+// que se rechazan por un JSON mal formado
+app.use(httpLogger);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
-
-// ── HTTP request logging ──────────────────────────────────────────────────
-app.use(httpLogger);
 
 // Rutas
 app.use('/api/auth', require('./routes/auth'));
@@ -48,6 +50,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/sgc',       require('./routes/sgc'));
 app.use('/api/my-tasks',  require('./routes/myTasks'));
 app.use('/api/settings',  require('./routes/settings'));
+app.use('/api/auditoria', require('./routes/auditoria'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -95,6 +98,9 @@ app.listen(PORT, HOST, () => {
 
   // Envío de correos de notificación en segundo plano
   require('./services/email').iniciarProceso();
+
+  // La bitácora de auditoría conserva un año
+  require('./services/auditoria').iniciarDepuracion();
 
   // Dónde van a parar los adjuntos, visible desde el arranque
   const gdrive = require('./services/gdrive');

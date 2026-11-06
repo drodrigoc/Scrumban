@@ -33,6 +33,7 @@ CREATE TABLE users (
   email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
   reset_token         VARCHAR(255) DEFAULT NULL,
   reset_token_expires DATETIME DEFAULT NULL,
+  last_login_at       DATETIME DEFAULT NULL,
   created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -368,6 +369,29 @@ CREATE TABLE email_queue (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_email_queue_pendientes ON email_queue(status, send_after);
+
+-- 18c. Bitacora de auditoria (accesos y cambios importantes; se conserva un ano)
+CREATE TABLE auditoria (
+  id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+  creado_en       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  user_id         INT           DEFAULT NULL,
+  usuario_nombre  VARCHAR(255)  DEFAULT NULL,
+  usuario_correo  VARCHAR(255)  DEFAULT NULL,
+  accion          VARCHAR(50)   NOT NULL,
+  categoria       VARCHAR(20)   NOT NULL,
+  resultado       VARCHAR(10)   NOT NULL DEFAULT 'exito',
+  entidad         VARCHAR(30)   DEFAULT NULL,
+  entidad_id      INT           DEFAULT NULL,
+  entidad_nombre  VARCHAR(255)  DEFAULT NULL,
+  detalle         VARCHAR(1000) DEFAULT NULL,
+  ip              VARCHAR(45)   DEFAULT NULL,
+  navegador       VARCHAR(255)  DEFAULT NULL,
+  INDEX idx_auditoria_fecha     (creado_en),
+  INDEX idx_auditoria_usuario   (user_id, creado_en),
+  INDEX idx_auditoria_categoria (categoria, creado_en),
+  INDEX idx_auditoria_correo    (usuario_correo),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 18. Indices de rendimiento
 CREATE INDEX idx_tasks_project        ON tasks(project_id);

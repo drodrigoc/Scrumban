@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const db = require('../config/database');
 const email = require('../services/email');
 const { render, urlApp } = require('../services/plantillasCorreo');
+const auditoria = require('../services/auditoria');
 
 // En la base solo se guarda el hash del token de recuperación: si alguien
 // leyera la tabla, no podría usar los enlaces vigentes
@@ -39,16 +40,31 @@ exports.login = async (req, res) => {
     // tarda lo mismo y no se puede descubrir qué correos están registrados
     const isMatch = await bcrypt.compare(String(password), user && user.password ? user.password : HASH_FALSO);
     if (!user || !isMatch) {
+      // Al usuario se le responde igual en ambos casos; la auditoría sí
+      // distingue el motivo para que el administrador pueda ayudarle
+      auditoria.registrar(req, {
+        accion: 'login_fallido', resultado: 'fallo',
+        usuario: user ? { id: user.id, name: user.name, email: user.email } : null,
+        correo: String(email).toLowerCase().trim(),
+        detalle: user ? 'Contraseña incorrecta' : 'El correo no está registrado',
+      });
       return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
     // La cuenta deshabilitada se informa solo con la contraseña correcta,
     // para no revelar a terceros qué emails existen
     if (!user.is_active) {
+      auditoria.registrar(req, {
+        accion: 'login_fallido', resultado: 'fallo', usuario: user,
+        detalle: 'La cuenta está deshabilitada',
+      });
       return res.status(403).json({ message: 'Cuenta deshabilitada. Contacte al administrador.' });
     }
 
     const token = generateToken(user.id);
+    await db.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id])
+      .catch(err => logger.warn('No se pudo guardar el último acceso', { message: err.message }));
+    auditoria.registrar(req, { accion: 'login', usuario: user });
 
     const { password: _, ...userWithoutPassword } = user;
     res.json({ token, user: userWithoutPassword });
@@ -71,6 +87,13 @@ exports.getMe = async (req, res) => {
   }
 };
 
+// El token JWT no se puede invalidar en el servidor: el cierre de sesión
+// solo queda registrado y el navegador borra su copia
+exports.logout = async (req, res) => {
+  await auditoria.registrar(req, { accion: 'logout' });
+  res.json({ message: 'Sesión cerrada' });
+};
+
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -83,9 +106,17 @@ exports.forgotPassword = async (req, res) => {
     );
 
     // Siempre responder igual para no revelar si el email existe
-    if (!users.length || !users[0].is_active) return res.json(respuesta);
+    if (!users.length || !users[0].is_active) {
+      auditoria.registrar(req, {
+        accion: 'recuperacion_solicitada', resultado: 'fallo',
+        usuario: users[0] || null, correo: String(email || '').toLowerCase().trim() || null,
+        detalle: users.length ? 'La cuenta está deshabilitada' : 'El correo no está registrado',
+      });
+      return res.json(respuesta);
+    }
 
     const usuario = users[0];
+    auditoria.registrar(req, { accion: 'recuperacion_solicitada', usuario });
     const resetToken = crypto.randomBytes(32).toString('hex');
 
     // El vencimiento se calcula en MySQL, igual que la comparación al
@@ -121,11 +152,15 @@ exports.resetPassword = async (req, res) => {
     }
 
     const [users] = await db.query(
-      'SELECT id FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
+      'SELECT id, name, email FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
       [hashToken(token)]
     );
 
     if (!users.length) {
+      auditoria.registrar(req, {
+        accion: 'contrasena_restablecida', resultado: 'fallo',
+        detalle: 'Enlace de recuperación inválido o vencido',
+      });
       return res.status(400).json({ message: 'Token inválido o expirado' });
     }
 
@@ -134,6 +169,7 @@ exports.resetPassword = async (req, res) => {
       'UPDATE users SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
       [hashed, users[0].id]
     );
+    auditoria.registrar(req, { accion: 'contrasena_restablecida', usuario: users[0] });
 
     res.json({ message: 'Contraseña restablecida correctamente' });
   } catch (error) {

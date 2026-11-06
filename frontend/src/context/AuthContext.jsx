@@ -30,6 +30,9 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Queda registrado en la auditoría; si falla, la sesión se cierra igual
+    const token = localStorage.getItem('token');
+    if (token) authAPI.logout(token).catch(() => {});
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);

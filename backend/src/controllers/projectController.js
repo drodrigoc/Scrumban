@@ -3,6 +3,13 @@ const db = require('../config/database');
 const notificaciones = require('../services/notificaciones');
 const { permisosDeArchivo } = require('../middleware/auth');
 const { eliminarAdjunto } = require('./taskController');
+const auditoria = require('../services/auditoria');
+
+const ROL_LEGIBLE = { coordinator: 'coordinador', member: 'miembro', viewer: 'observador' };
+const nombreDe = async (userId) => {
+  const [[u]] = await db.query('SELECT name, email FROM users WHERE id = ?', [userId]);
+  return u ? `${u.name} <${u.email}>` : `usuario #${userId}`;
+};
 
 const ROLES_PROYECTO = ['coordinator', 'member', 'viewer'];
 
@@ -151,6 +158,10 @@ exports.create = async (req, res) => {
     }
 
     const [projects] = await db.query('SELECT * FROM projects WHERE id = ?', [projectId]);
+    auditoria.registrar(req, {
+      accion: 'proyecto_creado', entidad: 'proyecto', entidadId: projectId, entidadNombre: projects[0].name,
+      detalle: members?.length ? `${members.length} miembro(s) iniciales` : null,
+    });
     res.status(201).json(projects[0]);
   } catch (error) {
     logger.error(error);
@@ -197,6 +208,7 @@ exports.archive = async (req, res) => {
     if (req.acceso.archivado) return res.status(400).json({ message: 'El proyecto ya está archivado' });
 
     await db.query('UPDATE projects SET archived_at = NOW(), archived_by = ? WHERE id = ?', [req.user.id, req.params.id]);
+    auditoria.registrar(req, { accion: 'proyecto_archivado', entidad: 'proyecto', entidadId: Number(req.params.id) });
     res.json({ message: 'Proyecto archivado' });
   } catch (error) {
     logger.error(error);
@@ -213,6 +225,7 @@ exports.unarchive = async (req, res) => {
     if (!req.acceso.archivado) return res.status(400).json({ message: 'El proyecto no está archivado' });
 
     await db.query('UPDATE projects SET archived_at = NULL, archived_by = NULL WHERE id = ?', [req.params.id]);
+    auditoria.registrar(req, { accion: 'proyecto_restaurado', entidad: 'proyecto', entidadId: Number(req.params.id) });
     res.json({ message: 'Proyecto restaurado' });
   } catch (error) {
     logger.error(error);
@@ -263,6 +276,10 @@ exports.delete = async (req, res) => {
 
     await db.query('DELETE FROM projects WHERE id = ?', [id]);
     logger.info('Proyecto eliminado', { projectId: Number(id), nombre: proyecto.name, archivos: adjuntos.length, userId: req.user.id });
+    auditoria.registrar(req, {
+      accion: 'proyecto_eliminado', entidad: 'proyecto', entidadId: Number(id), entidadNombre: proyecto.name,
+      detalle: `${adjuntos.length} archivo(s) eliminados con el proyecto`,
+    });
     res.json({ message: 'Proyecto eliminado', archivos: adjuntos.length });
   } catch (error) {
     logger.error(error);
@@ -293,6 +310,10 @@ exports.addMember = async (req, res) => {
     );
 
     await notificaciones.agregadoProyecto({ projectId: id, userId: user_id, rol: role || 'member', actor: req.user });
+    auditoria.registrar(req, {
+      accion: 'miembro_agregado', entidad: 'proyecto', entidadId: Number(id),
+      detalle: `${await nombreDe(user_id)} como ${ROL_LEGIBLE[role || 'member']}`,
+    });
 
     res.status(201).json({ message: 'Miembro agregado' });
   } catch (error) {
@@ -311,10 +332,21 @@ exports.updateMemberRole = async (req, res) => {
     }
     // Quién puede cambiar roles lo decide la ruta (nivel "gestion")
 
+    const [[actual]] = await db.query(
+      'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?', [id, userId]
+    );
+    if (!actual) return res.status(404).json({ message: 'El usuario no es miembro del proyecto' });
+
     await db.query(
       'UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?',
       [role, id, userId]
     );
+    if (actual.role !== role) {
+      auditoria.registrar(req, {
+        accion: 'rol_miembro_cambiado', entidad: 'proyecto', entidadId: Number(id),
+        detalle: `${await nombreDe(userId)}: ${ROL_LEGIBLE[actual.role] || actual.role} → ${ROL_LEGIBLE[role]}`,
+      });
+    }
     res.json({ message: 'Rol actualizado' });
   } catch (error) {
     logger.error(error);
@@ -324,10 +356,16 @@ exports.updateMemberRole = async (req, res) => {
 
 exports.removeMember = async (req, res) => {
   try {
-    await db.query(
+    const [r] = await db.query(
       'DELETE FROM project_members WHERE project_id = ? AND user_id = ?',
       [req.params.id, req.params.userId]
     );
+    if (r.affectedRows) {
+      auditoria.registrar(req, {
+        accion: 'miembro_quitado', entidad: 'proyecto', entidadId: Number(req.params.id),
+        detalle: await nombreDe(req.params.userId),
+      });
+    }
     res.json({ message: 'Miembro eliminado' });
   } catch (error) {
     logger.error(error);

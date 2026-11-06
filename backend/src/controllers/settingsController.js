@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 const email  = require('../services/email');
 const oauth  = require('../services/googleOAuth');
 const { render, urlApp } = require('../services/plantillasCorreo');
+const auditoria = require('../services/auditoria');
 
 const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,6 +34,12 @@ exports.updateEmail = async (req, res) => {
       return res.status(400).json({ message: 'La dirección del remitente no es un correo válido' });
     }
     await email.actualizarAjustes({ nombre, remitente, activo }, req.user.id);
+    const cambios = [
+      nombre !== undefined    && `nombre del remitente: ${nombre || '—'}`,
+      remitente !== undefined && `dirección: ${remitente || '—'}`,
+      activo !== undefined    && `envío de correos: ${activo ? 'activo' : 'pausado'}`,
+    ].filter(Boolean).join('; ');
+    auditoria.registrar(req, { accion: 'correo_ajustes', entidad: 'correo', detalle: cambios || null });
     res.json(await email.estado());
   } catch (error) {
     logger.error(error);
@@ -74,7 +81,7 @@ exports.oauthCallback = async (req, res) => {
   }
 
   try {
-    const [[admin]] = await db.query('SELECT id, role, is_active FROM users WHERE id = ?', [uid]);
+    const [[admin]] = await db.query('SELECT id, name, email, role, is_active FROM users WHERE id = ?', [uid]);
     if (!admin || admin.role !== 'admin' || !admin.is_active) {
       return volver(res, { resultado: 'error', detalle: 'Solo un administrador puede conectar la cuenta de correo.' });
     }
@@ -90,6 +97,7 @@ exports.oauthCallback = async (req, res) => {
 
     await email.conectarCuenta({ email: cuenta, refreshToken }, uid);
     logger.info('Cuenta de correo del sistema conectada', { cuenta, por: uid });
+    auditoria.registrar(req, { accion: 'correo_conectado', usuario: admin, entidad: 'correo', entidadNombre: cuenta });
     volver(res, { resultado: 'conectado', cuenta });
   } catch (err) {
     logger.error('Error al conectar la cuenta de correo', { message: err.message });
@@ -128,7 +136,9 @@ exports.retryFailed = async (req, res) => {
 // DELETE /api/settings/email — desconecta la cuenta y revoca el permiso en Google
 exports.disconnect = async (req, res) => {
   try {
+    const { cuenta } = await email.estado().catch(() => ({}));
     await email.desconectarCuenta(req.user.id);
+    auditoria.registrar(req, { accion: 'correo_desconectado', entidad: 'correo', entidadNombre: cuenta || null });
     res.json({ message: 'Cuenta de correo desconectada' });
   } catch (error) {
     logger.error(error);

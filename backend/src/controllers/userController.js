@@ -2,6 +2,25 @@
 const bcrypt = require('bcryptjs');
 const db = require('../config/database');
 const { hoyLocal } = require('../services/sgcCobertura');
+const auditoria = require('../services/auditoria');
+
+// Cómo se muestran los campos de un usuario en la auditoría
+const CAMPOS_AUDITADOS = {
+  name: 'nombre', email: 'correo', role: 'rol', unit: 'unidad',
+  is_active: 'activo', sgc_access: 'acceso SGC', avatar: 'foto',
+};
+const valorLegible = (campo, v) => {
+  if (campo === 'avatar') return v ? 'con foto' : 'sin foto';
+  if (campo === 'is_active' || campo === 'sgc_access') return v ? 'sí' : 'no';
+  return v == null || v === '' ? '—' : String(v);
+};
+// "rol: member → coordinator; unidad: — → Calidad"
+function describirCambios(antes, despues) {
+  return Object.keys(CAMPOS_AUDITADOS)
+    .filter(c => valorLegible(c, antes[c]) !== valorLegible(c, despues[c]))
+    .map(c => `${CAMPOS_AUDITADOS[c]}: ${valorLegible(c, antes[c])} → ${valorLegible(c, despues[c])}`)
+    .join('; ');
+}
 
 // Valores válidos de rol y formato mínimo de email
 const ROLES_VALIDOS = ['admin', 'coordinator', 'member', 'superViewer'];
@@ -17,8 +36,10 @@ const idDeUrl = (req) => {
 
 exports.getAll = async (req, res) => {
   try {
+    // El último acceso solo lo ve un administrador
+    const ultimoAcceso = req.user.role === 'admin' ? ', last_login_at' : '';
     const [users] = await db.query(
-      'SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at FROM users ORDER BY name'
+      `SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at${ultimoAcceso} FROM users ORDER BY name`
     );
     res.json(users);
   } catch (error) {
@@ -69,6 +90,12 @@ exports.create = async (req, res) => {
       'INSERT INTO users (name, email, password, role, unit) VALUES (?, ?, ?, ?, ?)',
       [name.trim(), email.toLowerCase().trim(), hashed, role || 'member', unit || null]
     );
+
+    auditoria.registrar(req, {
+      accion: 'usuario_creado', entidad: 'usuario', entidadId: result.insertId,
+      entidadNombre: `${name.trim()} <${email.toLowerCase().trim()}>`,
+      detalle: `rol: ${role || 'member'}${unit ? `; unidad: ${unit}` : ''}`,
+    });
 
     res.status(201).json({
       id: result.insertId,
@@ -134,13 +161,21 @@ exports.update = async (req, res) => {
 
     if (!fields.length) return res.status(400).json({ message: 'No hay campos para actualizar' });
 
+    const SELECCION = 'SELECT id, name, email, role, sgc_access, unit, is_active, avatar FROM users WHERE id = ?';
+    const [[antes]] = await db.query(SELECCION, [id]);
+    if (!antes) return res.status(404).json({ message: 'Usuario no encontrado' });
+
     values.push(id);
     await db.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 
-    const [updated] = await db.query(
-      'SELECT id, name, email, role, sgc_access, unit, is_active, avatar FROM users WHERE id = ?',
-      [id]
-    );
+    const [updated] = await db.query(SELECCION, [id]);
+    const cambios = describirCambios(antes, updated[0]);
+    if (cambios) {
+      auditoria.registrar(req, {
+        accion: 'usuario_modificado', entidad: 'usuario', entidadId: id,
+        entidadNombre: `${updated[0].name} <${updated[0].email}>`, detalle: cambios,
+      });
+    }
     res.json(updated[0]);
   } catch (error) {
     // Carrera entre la verificación y el UPDATE: el índice único lo detiene
@@ -163,7 +198,9 @@ exports.resetPassword = async (req, res) => {
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [hashed, id]);
+    const [r] = await db.query('UPDATE users SET password = ? WHERE id = ?', [hashed, id]);
+    if (!r.affectedRows) return res.status(404).json({ message: 'Usuario no encontrado' });
+    auditoria.registrar(req, { accion: 'contrasena_cambiada_admin', entidad: 'usuario', entidadId: id });
     res.json({ message: 'Contraseña restablecida correctamente' });
   } catch (error) {
     logger.error(error);
@@ -183,6 +220,11 @@ exports.toggleStatus = async (req, res) => {
       'SELECT id, name, email, role, unit, is_active FROM users WHERE id = ?',
       [id]
     );
+    if (!users.length) return res.status(404).json({ message: 'Usuario no encontrado' });
+    auditoria.registrar(req, {
+      accion: users[0].is_active ? 'usuario_habilitado' : 'usuario_deshabilitado',
+      entidad: 'usuario', entidadId: id, entidadNombre: `${users[0].name} <${users[0].email}>`,
+    });
     res.json(users[0]);
   } catch (error) {
     logger.error(error);

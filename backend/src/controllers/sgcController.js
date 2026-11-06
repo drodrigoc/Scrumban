@@ -4,6 +4,23 @@ const sgcCarpetas = require('../services/sgcCarpetas');
 const sgcCobertura = require('../services/sgcCobertura');
 const sgcActividad = require('../services/sgcActividad');
 const { construirLibro } = require('../services/sgcReporte');
+const auditoria = require('../services/auditoria');
+
+// "Criterio 1.2 — Gestión académica"
+const describirNivel = (nivel, codigo, nombre) =>
+  `${NOMBRE_NIVEL[nivel][0].toUpperCase()}${NOMBRE_NIVEL[nivel].slice(1)} ${codigo} — ${nombre}`;
+const auditarCatalogo = (req, accion, nivel, id, codigo, nombre, detalle = null) =>
+  auditoria.registrar(req, {
+    accion, entidad: 'sgc', entidadId: Number(id),
+    entidadNombre: describirNivel(nivel, codigo, nombre), detalle,
+  });
+// Qué cambió entre dos versiones de un elemento del catálogo
+function cambiosCatalogo(antes, despues) {
+  return Object.entries(despues)
+    .filter(([campo, valor]) => String(antes[campo] ?? '') !== String(valor ?? ''))
+    .map(([campo, valor]) => `${campo}: ${antes[campo] ?? '—'} → ${valor ?? '—'}`)
+    .join('; ') || null;
+}
 
 /*
  * Catálogo SGC en cuatro niveles:
@@ -278,6 +295,7 @@ const crearNivel = (nivel) => async (req, res) => {
       valores
     );
     const [[fila]] = await db.query(`SELECT * FROM ${conf.tabla} WHERE id = ?`, [result.insertId]);
+    auditarCatalogo(req, 'sgc_catalogo_creado', nivel, fila.id, fila.codigo, fila.nombre);
     res.status(201).json(fila);
   } catch (err) {
     responderError(res, err, `crear el ${NOMBRE_NIVEL[nivel]}`);
@@ -330,6 +348,10 @@ const actualizarNivel = (nivel) => async (req, res) => {
 
     const aviso = await sgcCarpetas.reubicar(rutaVieja, await sgcCarpetas.rutaDeNivel(nivel, id));
     const [[fila]] = await db.query(`SELECT * FROM ${conf.tabla} WHERE id = ?`, [id]);
+    const cambios = cambiosCatalogo(actual, {
+      codigo, nombre, descripcion, ...(conf.padre ? { [conf.padre.campo]: padreId } : {}),
+    });
+    if (cambios) auditarCatalogo(req, 'sgc_catalogo_modificado', nivel, id, fila.codigo, fila.nombre, cambios);
     res.json(aviso ? { ...fila, drive_aviso: aviso } : fila);
   } catch (err) {
     responderError(res, err, `actualizar el ${NOMBRE_NIVEL[nivel]}`);
@@ -350,8 +372,10 @@ const eliminarNivel = (nivel) => async (req, res) => {
       });
     }
 
+    const [[actual]] = await db.query(`SELECT codigo, nombre FROM ${conf.tabla} WHERE id = ?`, [id]);
     const [result] = await db.query(`DELETE FROM ${conf.tabla} WHERE id = ?`, [id]);
     if (!result.affectedRows) return res.status(404).json({ message: 'Registro no encontrado' });
+    auditarCatalogo(req, 'sgc_catalogo_eliminado', nivel, id, actual.codigo, actual.nombre);
     res.json({ message: 'Eliminado' });
   } catch (err) {
     responderError(res, err, `eliminar el ${NOMBRE_NIVEL[nivel]}`);
@@ -395,6 +419,7 @@ exports.create = async (req, res) => {
       [indicador.id, evidencia, nombre, descripcion]
     );
     const [[fila]] = await db.query(`${SELECT_EVIDENCIA} WHERE e.id = ?`, [result.insertId]);
+    auditarCatalogo(req, 'sgc_catalogo_creado', 'evidencia', result.insertId, evidencia, nombre);
     res.status(201).json(fila);
   } catch (err) {
     responderError(res, err, 'crear la evidencia');
@@ -436,6 +461,10 @@ exports.update = async (req, res) => {
     // Si cambió de indicador, de código o de nombre, su carpeta lo sigue
     const aviso = await sgcCarpetas.reubicar(rutaVieja, await sgcCarpetas.rutaDeNivel('evidencia', id));
     const [[fila]] = await db.query(`${SELECT_EVIDENCIA} WHERE e.id = ?`, [id]);
+    const cambios = cambiosCatalogo(actual, {
+      evidencia, nombre_evidencia: nombre, descripcion, indicador_id: indicador.id,
+    });
+    if (cambios) auditarCatalogo(req, 'sgc_catalogo_modificado', 'evidencia', id, evidencia, nombre, cambios);
     res.json(aviso ? { ...fila, drive_aviso: aviso } : fila);
   } catch (err) {
     responderError(res, err, 'actualizar la evidencia');
@@ -445,8 +474,10 @@ exports.update = async (req, res) => {
 // DELETE /api/sgc/:id — sus archivos no se borran: quedan sin evidencia
 exports.remove = async (req, res) => {
   try {
+    const [[actual]] = await db.query('SELECT evidencia, nombre_evidencia FROM sgc_evidencias WHERE id = ?', [req.params.id]);
     const [result] = await db.query('DELETE FROM sgc_evidencias WHERE id = ?', [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: 'Evidencia no encontrada' });
+    auditarCatalogo(req, 'sgc_catalogo_eliminado', 'evidencia', req.params.id, actual.evidencia, actual.nombre_evidencia);
     res.json({ message: 'Evidencia eliminada' });
   } catch (err) {
     responderError(res, err, 'eliminar la evidencia');

@@ -1,7 +1,22 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { usersAPI, unitsAPI } from '../services/api';
-import { Plus, Search, Edit, UserX, UserCheck, Key, Building2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Search, Edit, UserX, UserCheck, Key, Building2, ScrollText } from 'lucide-react';
+
+// "hace 5 min", "ayer a las 8:15", "12 oct 2026"
+function ultimoAcceso(fecha) {
+  if (!fecha) return null;
+  const d = new Date(fecha);
+  const minutos = Math.round((Date.now() - d.getTime()) / 60000);
+  const hora = d.toLocaleTimeString('es-SV', { hour: 'numeric', minute: '2-digit' });
+  if (minutos < 1)  return 'hace un momento';
+  if (minutos < 60) return `hace ${minutos} min`;
+  const hoy = new Date(); const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+  if (d.toDateString() === hoy.toDateString())  return `hoy a las ${hora}`;
+  if (d.toDateString() === ayer.toDateString()) return `ayer a las ${hora}`;
+  return d.toLocaleDateString('es-SV', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 import Modal from '../components/common/Modal';
 
 export const roleConfig = {
@@ -128,12 +143,13 @@ export default function Users() {
                 <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Unidad</th>
                 <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Rol</th>
                 <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Estado</th>
+                <th className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Último acceso</th>
                 <th className="text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-4 py-3">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
               {filtered.length === 0 ? (
-                <tr><td colSpan={5} className="text-center text-gray-400 dark:text-gray-500 py-8">No hay usuarios</td></tr>
+                <tr><td colSpan={6} className="text-center text-gray-400 dark:text-gray-500 py-8">No hay usuarios</td></tr>
               ) : filtered.map(u => {
                 const roleInfo = roleConfig[u.role] || roleConfig.member;
                 return (
@@ -169,8 +185,24 @@ export default function Users() {
                         {u.is_active ? 'Activo' : 'Deshabilitado'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {u.last_login_at ? (
+                        <span className="text-sm text-gray-600 dark:text-gray-400" title={new Date(u.last_login_at).toLocaleString('es-SV')}>
+                          {ultimoAcceso(u.last_login_at)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">Nunca</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <Link
+                          to={`/auditoria?usuario=${u.id}`}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+                          title="Ver su actividad" aria-label={`Ver la actividad de ${u.name}`}
+                        >
+                          <ScrollText className="w-4 h-4" />
+                        </Link>
                         <button
                           onClick={() => { setEditing(u); setShowModal(true); }}
                           className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
