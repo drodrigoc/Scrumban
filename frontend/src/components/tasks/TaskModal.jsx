@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { tasksAPI, projectsAPI, sgcAPI, phasesAPI } from '../../services/api';
+import { tasksAPI, projectsAPI, sgcAPI, phasesAPI, budgetAPI } from '../../services/api';
+import SelectorBuscable, { CampoSelector } from '../common/SelectorBuscable';
 import {
   Trash2, Send, Paperclip, Clock, Tag, User, Calendar,
-  AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck, Layers,
+  AlertTriangle, CheckSquare, Plus, X, Check, ShieldCheck, Layers, Wallet,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -26,7 +27,13 @@ const historyFieldLabels = {
   status: 'estado', priority: 'prioridad', assignee: 'responsable',
   title: 'título', created: 'creó la tarea',
   phase: 'la fase', archived: 'el archivado',
+  costo: 'el costo', partida: 'la partida',
 };
+
+const dinero = (n) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n) || 0);
+
+const ROL_PROYECTO = { coordinator: 'Coordinador', member: 'Miembro', viewer: 'Visor' };
 
 // Formatos que acepta el backend. Filtra el explorador de archivos para
 // que no se pueda elegir algo que luego sería rechazado.
@@ -228,7 +235,12 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
     sgc_ids:     task?.sgc_evidencias?.map(e => e.id) || [],
     costo:       task?.costo != null ? String(task.costo) : '',
     phase_id:    task?.phase_id != null ? String(task.phase_id) : '',
+    budget_item_id: task?.budget_item_id ?? null,
   });
+
+  // Partidas del presupuesto (para asignar el costo) y el selector abierto
+  const [presupuesto, setPresupuesto] = useState(null);
+  const [selector, setSelector]       = useState(null); // 'responsable' | 'partida' | null
 
   // Fases del cronograma macro del proyecto
   const [phases, setPhases] = useState([]);
@@ -280,6 +292,13 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       .catch(() => {});
   }, [projectId]);
 
+  // Partidas del presupuesto: si no se pueden leer, el campo no aparece
+  useEffect(() => {
+    budgetAPI.getAll(projectId)
+      .then(({ data }) => setPresupuesto(data))
+      .catch(() => {});
+  }, [projectId]);
+
   // Load checklist lazily when tab is first opened
   useEffect(() => {
     if (activeTab === 'checklist' && task?.id && checklist === null) {
@@ -306,6 +325,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
         due_date:    form.due_date    || null,
         costo:       form.costo !== '' ? parseFloat(form.costo) : null,
         phase_id:    form.phase_id !== '' ? parseInt(form.phase_id, 10) : null,
+        budget_item_id: form.budget_item_id || null,
       });
     } finally {
       setSaving(false);
@@ -439,6 +459,53 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
     }
   };
 
+  // ── Responsable ──
+  // Los visores no pueden ser responsables (el servidor lo rechaza),
+  // salvo que ya lo fueran de esta tarea
+  const responsableId = Number(form.assignee_id) || null;
+  const responsableActual = members.find(m => m.id === responsableId);
+  const textoResponsable = responsableId
+    ? (responsableActual?.name || task?.assignee_name || 'Responsable')
+    : null;
+  const opcionesResponsable = members
+    .filter(m => m.project_role !== 'viewer' || m.id === responsableId)
+    .map(m => ({
+      value:   m.id,
+      label:   m.name,
+      inicial: m.name?.charAt(0).toUpperCase(),
+      detalle: [m.email, m.unit].filter(Boolean).join(' · '),
+      extra:   <span className="text-gray-400 dark:text-gray-500">{ROL_PROYECTO[m.project_role] || ''}</span>,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+
+  // ── Partida del presupuesto ──
+  // Solo las variables: el ejecutado de las fijas se escribe a mano
+  const partidasVariables = (presupuesto?.items || []).filter(p => p.tipo === 'variable');
+  const partidaActual = (presupuesto?.items || []).find(p => p.id === form.budget_item_id);
+  const textoPartida = form.budget_item_id ? (partidaActual?.categoria || 'Partida') : null;
+  const opcionesPartida = partidasVariables.map(p => ({
+    value:   p.id,
+    label:   p.categoria,
+    detalle: `Estimado ${dinero(p.monto_estimado)} · ejecutado ${dinero(p.ejecutado)}`,
+    buscar:  p.descripcion,
+    extra: (
+      <span className={`font-medium ${p.disponible < 0 ? 'text-red-500' : p.disponible === 0 ? 'text-amber-500' : 'text-green-600 dark:text-green-400'}`}>
+        {p.disponible < 0 ? `Excedida ${dinero(-p.disponible)}` : `Quedan ${dinero(p.disponible)}`}
+      </span>
+    ),
+  }));
+
+  // Cómo quedaría la partida con el costo escrito. Su ejecutado ya incluye
+  // el costo guardado de esta tarea si ya estaba asignada a ella.
+  const costoNuevo = parseFloat(form.costo) || 0;
+  const excedente = (() => {
+    if (!partidaActual || partidaActual.tipo !== 'variable') return 0;
+    const yaContado = task?.budget_item_id === partidaActual.id ? Number(task?.costo) || 0 : 0;
+    return partidaActual.ejecutado - yaContado + costoNuevo - partidaActual.monto_estimado;
+  })();
+
+  const cerrarSelector = useCallback(() => setSelector(null), []);
+
   const tabs = [
     { id: 'details',  label: 'Detalles' },
     ...(task?.id ? [
@@ -496,11 +563,11 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label flex items-center gap-1"><User className="w-3.5 h-3.5" /> Responsable</label>
-              <select className="input" value={form.assignee_id}
-                onChange={e => setForm({ ...form, assignee_id: e.target.value })}>
-                <option value="">Sin asignar</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              <CampoSelector
+                texto={textoResponsable}
+                placeholder="Sin asignar"
+                onClick={() => setSelector('responsable')}
+              />
             </div>
             <div>
               <label className="label flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Prioridad</label>
@@ -558,6 +625,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             </div>
           )}
 
+          <div className={presupuesto ? 'grid grid-cols-2 gap-3' : ''}>
           <div>
             <label className="label flex items-center gap-1">
               <span className="text-gray-400 text-sm font-medium">$</span> Costo (USD)
@@ -575,6 +643,35 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               />
             </div>
           </div>
+
+          {presupuesto && (
+            <div>
+              <label className="label flex items-center gap-1">
+                <Wallet className="w-3.5 h-3.5" /> Partida del presupuesto
+              </label>
+              <CampoSelector
+                texto={textoPartida}
+                placeholder={partidasVariables.length ? 'Sin partida' : 'No hay partidas variables'}
+                disabled={!partidasVariables.length && !form.budget_item_id}
+                title={partidasVariables.length ? undefined
+                  : 'Crea partidas variables en el presupuesto del proyecto para asignarles costos'}
+                onClick={() => setSelector('partida')}
+              />
+            </div>
+          )}
+          </div>
+
+          {excedente > 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+              Con este costo, la partida «{partidaActual.categoria}» se excede por {dinero(excedente)}.
+            </p>
+          )}
+          {!readOnly && costoNuevo > 0 && !form.budget_item_id && partidasVariables.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Elige la partida para que este costo cuente en su ejecutado.
+            </p>
+          )}
 
           {/* ── Etiquetas ── */}
           <div>
@@ -1076,6 +1173,33 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             </div>
           ))}
         </div>
+      )}
+
+      {selector === 'responsable' && (
+        <SelectorBuscable
+          titulo="Responsable de la tarea"
+          placeholder="Buscar por nombre, correo o unidad…"
+          opciones={opcionesResponsable}
+          valor={responsableId}
+          ninguno={{ label: 'Sin asignar' }}
+          vacio="El proyecto no tiene miembros que puedan ser responsables."
+          onElegir={v => setForm(f => ({ ...f, assignee_id: v ?? '' }))}
+          onCerrar={cerrarSelector}
+        />
+      )}
+
+      {selector === 'partida' && (
+        <SelectorBuscable
+          titulo="Partida del presupuesto"
+          placeholder="Buscar partida…"
+          opciones={opcionesPartida}
+          valor={form.budget_item_id}
+          ninguno={{ label: 'Sin partida' }}
+          vacio="El proyecto no tiene partidas variables."
+          pie="Solo aparecen las partidas variables. Las fijas (salarios, prestaciones…) se registran a mano en el presupuesto del proyecto."
+          onElegir={v => setForm(f => ({ ...f, budget_item_id: v }))}
+          onCerrar={cerrarSelector}
+        />
       )}
 
       {/* ── ATTACHMENTS ── */}

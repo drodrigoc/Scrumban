@@ -1,7 +1,19 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { budgetAPI } from '../../services/api';
-import { Wallet, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Wallet, Plus, Pencil, Trash2, ChevronRight, AlertTriangle } from 'lucide-react';
+
+/*
+ * Presupuesto del proyecto.
+ *
+ * - Presupuesto = suma de lo estimado en las partidas (se arma después
+ *   del cronograma, no al crear el proyecto).
+ * - Ejecutado de una partida fija: se escribe a mano (salarios…).
+ * - Ejecutado de una partida variable: suma del costo de sus tareas; la
+ *   partida se elige en cada tarea.
+ * - Las tareas con costo y sin partida también son gasto del proyecto:
+ *   se muestran aparte para asignarlas.
+ */
 
 const TIPOS = [
   { value: 'fijo',     label: 'Fijo'     },
@@ -13,8 +25,21 @@ const tipoBadge = {
   variable: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
 };
 
+const ESTADO_TAREA = {
+  pending: 'Pendiente', in_progress: 'En proceso', in_review: 'En revisión', completed: 'Completada',
+};
+
 const fmt = (n) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n) || 0);
+
+// Verde hasta 80 %, ámbar hasta 100 %, rojo si se pasó
+const tono = (pct) => (pct == null ? 'gris' : pct > 100 ? 'rojo' : pct >= 80 ? 'ambar' : 'verde');
+const COLOR = {
+  verde: { trazo: 'stroke-green-500', barra: 'bg-green-500', texto: 'text-green-600 dark:text-green-400' },
+  ambar: { trazo: 'stroke-amber-500', barra: 'bg-amber-500', texto: 'text-amber-600 dark:text-amber-400' },
+  rojo:  { trazo: 'stroke-red-500',   barra: 'bg-red-500',   texto: 'text-red-600 dark:text-red-400'     },
+  gris:  { trazo: 'stroke-gray-300',  barra: 'bg-gray-300',  texto: 'text-gray-500 dark:text-gray-400'   },
+};
 
 const emptyForm = {
   tipo: 'fijo', categoria: '', descripcion: '',
@@ -22,27 +47,34 @@ const emptyForm = {
 };
 
 export default function BudgetPanel({ projectId, canEdit }) {
-  const [items, setItems]     = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
+  const [data, setData]         = useState(null);
+  const [error, setError]       = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm]         = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [abiertas, setAbiertas]   = useState(() => new Set()); // filas con sus tareas a la vista
 
   const load = async () => {
     try {
       const { data } = await budgetAPI.getAll(projectId);
-      setItems(data.items);
-      setSummary(data.summary);
-    } catch {
-      toast.error('Error al cargar el presupuesto');
+      setData(data);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al cargar el presupuesto');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, [projectId]);
+
+  const alternar = (clave) => setAbiertas(prev => {
+    const nuevo = new Set(prev);
+    nuevo.has(clave) ? nuevo.delete(clave) : nuevo.add(clave);
+    return nuevo;
+  });
 
   const openNew = () => {
     setForm(emptyForm);
@@ -56,7 +88,7 @@ export default function BudgetPanel({ projectId, canEdit }) {
       categoria:       item.categoria,
       descripcion:     item.descripcion || '',
       monto_estimado:  item.monto_estimado != null ? String(item.monto_estimado) : '',
-      monto_ejecutado: item.monto_ejecutado != null ? String(item.monto_ejecutado) : '',
+      monto_ejecutado: item.tipo === 'fijo' && item.monto_ejecutado != null ? String(Number(item.monto_ejecutado)) : '',
       fecha:           item.fecha ? item.fecha.split('T')[0] : '',
     });
     setEditingId(item.id);
@@ -76,10 +108,15 @@ export default function BudgetPanel({ projectId, canEdit }) {
     }
     setSaving(true);
     const payload = {
-      ...form,
-      monto_estimado:  form.monto_estimado  === '' ? 0 : parseFloat(form.monto_estimado),
-      monto_ejecutado: form.monto_ejecutado === '' ? 0 : parseFloat(form.monto_ejecutado),
-      fecha: form.fecha || null,
+      tipo:           form.tipo,
+      categoria:      form.categoria,
+      descripcion:    form.descripcion,
+      monto_estimado: form.monto_estimado === '' ? 0 : parseFloat(form.monto_estimado),
+      fecha:          form.fecha || null,
+      // Solo las fijas llevan ejecutado escrito a mano
+      ...(form.tipo === 'fijo' && {
+        monto_ejecutado: form.monto_ejecutado === '' ? 0 : parseFloat(form.monto_ejecutado),
+      }),
     };
     try {
       if (editingId) {
@@ -99,7 +136,9 @@ export default function BudgetPanel({ projectId, canEdit }) {
   };
 
   const handleDelete = async (item) => {
-    if (!confirm(`¿Eliminar la partida "${item.categoria}"?`)) return;
+    const n = item.tareas?.length || 0;
+    const aviso = n ? `\n\nSus ${n} tarea${n === 1 ? '' : 's'} quedará${n === 1 ? '' : 'n'} sin partida.` : '';
+    if (!confirm(`¿Eliminar la partida "${item.categoria}"?${aviso}`)) return;
     try {
       await budgetAPI.delete(projectId, item.id);
       await load();
@@ -115,20 +154,24 @@ export default function BudgetPanel({ projectId, canEdit }) {
     </div>
   );
 
-  const fijos     = items.filter(i => i.tipo === 'fijo');
-  const variables = items.filter(i => i.tipo === 'variable');
-  const excedido  = summary?.sin_asignar != null && summary.sin_asignar < 0;
+  const items      = data?.items || [];
+  const summary    = data?.summary;
+  const sinPartida = data?.sin_partida || { total: 0, tareas: [] };
+  const fijos      = items.filter(i => i.tipo === 'fijo');
+  const variables  = items.filter(i => i.tipo === 'variable');
+  const hayDatos   = items.length > 0 || sinPartida.total > 0;
+  const columnas   = canEdit ? 6 : 5;
 
   return (
-    <div className="card p-5 space-y-4">
+    <div className="card p-5 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-primary-500" />
-            Presupuesto por partidas
+            Presupuesto del proyecto
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Desglose de costos fijos y variables, con su ejecución real
+            Se arma con las partidas. Las variables suman el costo de sus tareas; las fijas se registran a mano.
           </p>
         </div>
         {canEdit && !showForm && (
@@ -138,32 +181,12 @@ export default function BudgetPanel({ projectId, canEdit }) {
         )}
       </div>
 
-      {/* Resumen */}
-      {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <SummaryTile label="Estimado fijo"     value={fmt(summary.estimado_fijo)} />
-          <SummaryTile label="Estimado variable" value={fmt(summary.estimado_variable)} />
-          <SummaryTile label="Total estimado"    value={fmt(summary.estimado_total)} strong />
-          <SummaryTile label="Total ejecutado"   value={fmt(summary.ejecutado_total)} strong />
-        </div>
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-3">{error}</p>
       )}
 
-      {summary?.presupuesto != null && (
-        <div className={`rounded-lg p-3 text-sm flex items-center justify-between flex-wrap gap-2 ${
-          excedido
-            ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-            : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-        }`}>
-          <span>
-            Presupuesto autorizado: <b>{fmt(summary.presupuesto)}</b>
-          </span>
-          <span>
-            {excedido
-              ? `Excedido en ${fmt(Math.abs(summary.sin_asignar))}`
-              : `Sin asignar a partidas: ${fmt(summary.sin_asignar)}`}
-          </span>
-        </div>
-      )}
+      {/* Resumen */}
+      {summary && hayDatos && <Resumen summary={summary} />}
 
       {/* Formulario */}
       {showForm && (
@@ -215,14 +238,20 @@ export default function BudgetPanel({ projectId, canEdit }) {
                 onChange={e => setForm({ ...form, monto_estimado: e.target.value })}
               />
             </div>
-            <div>
-              <label className="label">Monto ejecutado</label>
-              <input
-                type="number" min="0" step="0.01" className="input" placeholder="0.00"
-                value={form.monto_ejecutado}
-                onChange={e => setForm({ ...form, monto_ejecutado: e.target.value })}
-              />
-            </div>
+            {form.tipo === 'fijo' ? (
+              <div>
+                <label className="label">Monto ejecutado</label>
+                <input
+                  type="number" min="0" step="0.01" className="input" placeholder="0.00"
+                  value={form.monto_ejecutado}
+                  onChange={e => setForm({ ...form, monto_ejecutado: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500 dark:text-gray-400 self-end pb-2">
+                El ejecutado se calcula con el costo de las tareas asignadas a esta partida.
+              </div>
+            )}
             <div>
               <label className="label">Fecha</label>
               <input
@@ -246,137 +275,284 @@ export default function BudgetPanel({ projectId, canEdit }) {
       )}
 
       {/* Tabla */}
-      {items.length === 0 ? (
+      {!hayDatos ? (
         <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-6">
-          Todavía no hay partidas. {canEdit ? 'Agrega la primera con "Nueva partida".' : ''}
+          Todavía no hay partidas.
+          {canEdit ? ' Arma el presupuesto con "Nueva partida" cuando tengas el cronograma.' : ''}
         </p>
       ) : (
         <div className="overflow-x-auto -mx-1">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[680px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
                 <th className="py-2 px-2 font-medium">Tipo</th>
                 <th className="py-2 px-2 font-medium">Categoría</th>
                 <th className="py-2 px-2 font-medium text-right">Estimado</th>
                 <th className="py-2 px-2 font-medium text-right">Ejecutado</th>
-                <th className="py-2 px-2 font-medium">Fecha</th>
+                <th className="py-2 px-2 font-medium text-right">Disponible</th>
                 {canEdit && <th className="py-2 px-2" />}
               </tr>
             </thead>
             <tbody>
-              {[
-                { titulo: 'Costos fijos',     rows: fijos },
-                { titulo: 'Costos variables', rows: variables },
-              ].filter(g => g.rows.length > 0).map(group => (
-                <BudgetGroup
-                  key={group.titulo}
-                  titulo={group.titulo}
-                  rows={group.rows}
-                  canEdit={canEdit}
-                  onEdit={openEdit}
-                  onDelete={handleDelete}
-                />
-              ))}
+              {fijos.length > 0 && (
+                <Grupo titulo="Costos fijos" rows={fijos} columnas={columnas}
+                  canEdit={canEdit} abiertas={abiertas} alternar={alternar}
+                  onEdit={openEdit} onDelete={handleDelete} />
+              )}
+              {(variables.length > 0 || sinPartida.total > 0) && (
+                <Grupo titulo="Costos variables" rows={variables} columnas={columnas}
+                  canEdit={canEdit} abiertas={abiertas} alternar={alternar}
+                  onEdit={openEdit} onDelete={handleDelete}
+                  sinPartida={sinPartida} />
+              )}
             </tbody>
           </table>
         </div>
-      )}
-
-      {summary?.total_costo_tareas > 0 && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700 pt-3">
-          Referencia: las tareas del proyecto tienen {fmt(summary.total_costo_tareas)} en costos registrados.
-          Ese monto se lleva aparte de estas partidas, así que no se suma dos veces.
-        </p>
       )}
     </div>
   );
 }
 
-function BudgetGroup({ titulo, rows, canEdit, onEdit, onDelete }) {
-  const subtotalEst = rows.reduce((s, r) => s + (Number(r.monto_estimado)  || 0), 0);
-  const subtotalEje = rows.reduce((s, r) => s + (Number(r.monto_ejecutado) || 0), 0);
+function Resumen({ summary }) {
+  const pct = summary.porcentaje;
+  const c = COLOR[tono(pct)];
+  const excedido = summary.disponible < 0;
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-5 items-center">
+      <Dona porcentaje={pct} trazo={c.trazo} />
+
+      <div className="flex-1 w-full space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          <Cifra etiqueta="Presupuesto" valor={fmt(summary.presupuesto)} />
+          <Cifra etiqueta="Ejecutado"   valor={fmt(summary.ejecutado)} />
+          <Cifra
+            etiqueta={excedido ? 'Excedido' : 'Disponible'}
+            valor={fmt(Math.abs(summary.disponible))}
+            clase={excedido ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
+          <Barra etiqueta="Fijos"     ejecutado={summary.ejecutado_fijo}     estimado={summary.estimado_fijo} />
+          <Barra etiqueta="Variables" ejecutado={summary.ejecutado_variable} estimado={summary.estimado_variable} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Gráfico circular: cuánto del presupuesto ya se ejecutó
+function Dona({ porcentaje, trazo }) {
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const lleno = porcentaje == null ? 0 : Math.min(porcentaje, 100) / 100;
+  return (
+    <div className="relative w-32 h-32 flex-shrink-0" role="img"
+      aria-label={porcentaje == null ? 'Sin presupuesto' : `${porcentaje}% del presupuesto ejecutado`}>
+      <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="12" className="stroke-gray-100 dark:stroke-gray-700" />
+        <circle
+          cx="60" cy="60" r={r} fill="none" strokeWidth="12" strokeLinecap="round"
+          className={`${trazo} transition-all duration-500`}
+          strokeDasharray={circ}
+          strokeDashoffset={circ * (1 - lleno)}
+          style={{ opacity: lleno > 0 ? 1 : 0 }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+          {porcentaje == null ? '—' : `${porcentaje}%`}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">ejecutado</span>
+      </div>
+    </div>
+  );
+}
+
+function Cifra({ etiqueta, valor, clase = 'text-gray-900 dark:text-gray-100' }) {
+  return (
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{etiqueta}</p>
+      <p className={`text-base sm:text-lg font-bold tabular-nums ${clase}`}>{valor}</p>
+    </div>
+  );
+}
+
+function Barra({ etiqueta, ejecutado, estimado }) {
+  const pct = estimado > 0 ? Math.round((ejecutado / estimado) * 100) : (ejecutado > 0 ? 101 : null);
+  const c = COLOR[tono(pct)];
+  return (
+    <div>
+      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1 gap-2">
+        <span>{etiqueta}</span>
+        <span className="tabular-nums">{fmt(ejecutado)} de {fmt(estimado)}</span>
+      </div>
+      <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+        <div className={`h-1.5 rounded-full ${c.barra}`} style={{ width: `${Math.min(pct || 0, 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function Disponible({ valor }) {
+  return (
+    <span className={`tabular-nums ${valor < 0 ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
+      {valor < 0 ? `−${fmt(-valor)}` : fmt(valor)}
+    </span>
+  );
+}
+
+function ListaTareas({ tareas, columnas }) {
+  return (
+    <tr>
+      <td colSpan={columnas} className="px-2 pb-2">
+        <ul className="ml-8 border-l-2 border-gray-100 dark:border-gray-700 pl-3 space-y-1">
+          {tareas.map(t => (
+            <li key={t.id} className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-gray-600 dark:text-gray-300 truncate">
+                {t.title}
+                <span className="text-gray-400 dark:text-gray-500">
+                  {' · '}{t.archived_at ? 'Archivada' : (ESTADO_TAREA[t.status] || t.status)}
+                </span>
+              </span>
+              <span className="tabular-nums text-gray-600 dark:text-gray-300 flex-shrink-0">{fmt(t.costo)}</span>
+            </li>
+          ))}
+        </ul>
+      </td>
+    </tr>
+  );
+}
+
+function BotonTareas({ n, abierta, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs text-primary-600 dark:text-primary-400 hover:underline"
+    >
+      <ChevronRight className={`w-3 h-3 transition-transform ${abierta ? 'rotate-90' : ''}`} />
+      {n} tarea{n === 1 ? '' : 's'}
+    </button>
+  );
+}
+
+function Grupo({ titulo, rows, columnas, canEdit, abiertas, alternar, onEdit, onDelete, sinPartida }) {
+  const extra = sinPartida?.total || 0;
+  const subEst = rows.reduce((s, r) => s + r.monto_estimado, 0);
+  const subEje = rows.reduce((s, r) => s + r.ejecutado, 0) + extra;
 
   return (
     <>
       <tr className="bg-gray-50/70 dark:bg-gray-800/40">
-        <td colSpan={canEdit ? 6 : 5} className="py-1.5 px-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        <td colSpan={columnas} className="py-1.5 px-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
           {titulo}
         </td>
       </tr>
 
-      {rows.map(item => (
-        <tr key={item.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50/60 dark:hover:bg-gray-800/30">
-          <td className="py-2 px-2">
-            <span className={`badge ${tipoBadge[item.tipo]}`}>
-              {item.tipo === 'fijo' ? 'Fijo' : 'Variable'}
-            </span>
-          </td>
-          <td className="py-2 px-2">
-            <p className="text-gray-700 dark:text-gray-300 font-medium">{item.categoria}</p>
-            {item.descripcion && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">{item.descripcion}</p>
-            )}
-          </td>
-          <td className="py-2 px-2 text-right tabular-nums text-gray-700 dark:text-gray-300">
-            {fmt(item.monto_estimado)}
-          </td>
-          <td className={`py-2 px-2 text-right tabular-nums ${
-            Number(item.monto_ejecutado) > Number(item.monto_estimado)
-              ? 'text-red-600 dark:text-red-400 font-medium'
-              : 'text-gray-700 dark:text-gray-300'
-          }`}>
-            {fmt(item.monto_ejecutado)}
-          </td>
-          <td className="py-2 px-2 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-            {item.fecha ? item.fecha.split('T')[0] : '—'}
-          </td>
-          {canEdit && (
-            <td className="py-2 px-2">
-              <div className="flex items-center gap-1 justify-end">
-                <button
-                  onClick={() => onEdit(item)}
-                  title="Editar partida"
-                  className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => onDelete(item)}
-                  title="Eliminar partida"
-                  className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+      {rows.map(item => {
+        const abierta = abiertas.has(item.id);
+        return (
+          <Fragment key={item.id}>
+            <tr className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50/60 dark:hover:bg-gray-800/30">
+              <td className="py-2 px-2 align-top">
+                <span className={`badge ${tipoBadge[item.tipo]}`}>
+                  {item.tipo === 'fijo' ? 'Fijo' : 'Variable'}
+                </span>
+              </td>
+              <td className="py-2 px-2 align-top">
+                <p className="text-gray-700 dark:text-gray-300 font-medium">{item.categoria}</p>
+                {(item.descripcion || item.fecha) && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {[item.descripcion, item.fecha?.split('T')[0]].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </td>
+              <td className="py-2 px-2 text-right tabular-nums text-gray-700 dark:text-gray-300 align-top">
+                {fmt(item.monto_estimado)}
+              </td>
+              <td className="py-2 px-2 text-right align-top">
+                <p className="tabular-nums text-gray-700 dark:text-gray-300">{fmt(item.ejecutado)}</p>
+                {item.origen === 'manual' ? (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">a mano</p>
+                ) : item.tareas.length > 0 ? (
+                  <BotonTareas n={item.tareas.length} abierta={abierta} onClick={() => alternar(item.id)} />
+                ) : (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">sin tareas</p>
+                )}
+              </td>
+              <td className="py-2 px-2 text-right align-top">
+                <Disponible valor={item.disponible} />
+              </td>
+              {canEdit && (
+                <td className="py-2 px-2 align-top">
+                  <div className="flex items-center gap-1 justify-end">
+                    <button
+                      onClick={() => onEdit(item)}
+                      title="Editar partida"
+                      className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(item)}
+                      title="Eliminar partida"
+                      className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </td>
+              )}
+            </tr>
+            {abierta && <ListaTareas tareas={item.tareas} columnas={columnas} />}
+          </Fragment>
+        );
+      })}
+
+      {/* Costos de tareas sin partida: cuentan en el ejecutado del proyecto */}
+      {extra > 0 && (
+        <>
+          <tr className="border-b border-gray-50 dark:border-gray-800 bg-amber-50/60 dark:bg-amber-900/10">
+            <td className="py-2 px-2 align-top">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
             </td>
-          )}
-        </tr>
-      ))}
+            <td className="py-2 px-2 align-top">
+              <p className="text-amber-800 dark:text-amber-300 font-medium">Tareas sin partida</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                Cuentan en el ejecutado del proyecto. Asígnales una partida desde cada tarea.
+              </p>
+            </td>
+            <td className="py-2 px-2 text-right tabular-nums text-gray-400 align-top">—</td>
+            <td className="py-2 px-2 text-right align-top">
+              <p className="tabular-nums text-gray-700 dark:text-gray-300">{fmt(extra)}</p>
+              <BotonTareas
+                n={sinPartida.tareas.length}
+                abierta={abiertas.has('sin')}
+                onClick={() => alternar('sin')}
+              />
+            </td>
+            <td className="py-2 px-2 text-right tabular-nums text-gray-400 align-top">—</td>
+            {canEdit && <td />}
+          </tr>
+          {abiertas.has('sin') && <ListaTareas tareas={sinPartida.tareas} columnas={columnas} />}
+        </>
+      )}
 
       <tr className="border-b border-gray-100 dark:border-gray-700">
         <td />
         <td className="py-1.5 px-2 text-xs text-gray-500 dark:text-gray-400">Subtotal</td>
         <td className="py-1.5 px-2 text-right tabular-nums text-sm font-semibold text-gray-700 dark:text-gray-300">
-          {fmt(subtotalEst)}
+          {fmt(subEst)}
         </td>
         <td className="py-1.5 px-2 text-right tabular-nums text-sm font-semibold text-gray-700 dark:text-gray-300">
-          {fmt(subtotalEje)}
+          {fmt(subEje)}
         </td>
-        <td colSpan={canEdit ? 2 : 1} />
+        <td className="py-1.5 px-2 text-right text-sm font-semibold">
+          <Disponible valor={subEst - subEje} />
+        </td>
+        {canEdit && <td />}
       </tr>
     </>
-  );
-}
-
-function SummaryTile({ label, value, strong }) {
-  return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
-      <p className={`tabular-nums ${strong
-        ? 'text-lg font-bold text-gray-900 dark:text-gray-100'
-        : 'text-base font-semibold text-gray-700 dark:text-gray-300'}`}>
-        {value}
-      </p>
-    </div>
   );
 }

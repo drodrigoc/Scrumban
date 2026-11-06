@@ -105,6 +105,7 @@ CREATE TABLE tasks (
   progress    INT DEFAULT 0,
   costo       DECIMAL(12,2) DEFAULT NULL,
   phase_id    INT DEFAULT NULL,
+  budget_item_id INT DEFAULT NULL,
   completed_at DATETIME DEFAULT NULL,
   archived_at  DATETIME DEFAULT NULL,
   created_by  INT DEFAULT NULL,
@@ -340,6 +341,11 @@ CREATE TABLE project_phases (
 
 ALTER TABLE tasks
   ADD CONSTRAINT fk_tasks_phase FOREIGN KEY (phase_id) REFERENCES project_phases(id) ON DELETE SET NULL;
+
+-- La partida variable del presupuesto a la que corresponde el costo de la tarea
+CREATE INDEX idx_tasks_budget_item ON tasks(budget_item_id);
+ALTER TABLE tasks
+  ADD CONSTRAINT fk_tasks_budget_item FOREIGN KEY (budget_item_id) REFERENCES project_budget_items(id) ON DELETE SET NULL;
 
 -- 18a. Configuracion editable desde la aplicacion
 CREATE TABLE system_settings (

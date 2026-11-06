@@ -86,7 +86,7 @@ exports.getById = async (req, res) => {
 
     // Obtener miembros
     const [members] = await db.query(
-      `SELECT u.id, u.name, u.email, u.avatar, u.role as system_role, pm.role as project_role
+      `SELECT u.id, u.name, u.email, u.avatar, u.unit, u.role as system_role, pm.role as project_role
        FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ?`,
       [req.params.id]
     );
@@ -116,6 +116,63 @@ exports.getById = async (req, res) => {
   }
 };
 
+// ── Validación de los datos del proyecto ─────────────────────────────────
+// El formulario manda los campos vacíos como '' (por ejemplo, una fecha sin
+// elegir). MySQL rechaza '' en una columna DATE y antes eso terminaba en un
+// "Error al crear proyecto" sin explicación. Aquí se limpian y se validan,
+// y si algo está mal se responde 400 con un mensaje que dice qué corregir.
+const ESTADOS_PROYECTO = ['active', 'paused', 'completed', 'cancelled'];
+
+function fechaValida(texto) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false;
+  const d = new Date(`${texto}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === texto;
+}
+
+/**
+ * Devuelve { datos } con los campos enviados ya limpios, o { error, campo }.
+ * crear: el nombre es obligatorio. actual: el proyecto guardado, para
+ * comparar las fechas cuando solo se cambia una.
+ */
+function limpiarProyecto(body, { crear = false, actual = null } = {}) {
+  const datos = {};
+
+  if (crear || body.name !== undefined) {
+    const nombre = String(body.name ?? '').trim();
+    if (!nombre) return { error: 'Escribe el nombre del proyecto', campo: 'name' };
+    if (nombre.length > 255) return { error: 'El nombre no puede pasar de 255 caracteres', campo: 'name' };
+    datos.name = nombre;
+  }
+
+  for (const campo of ['description', 'objectives']) {
+    if (body[campo] !== undefined) datos[campo] = String(body[campo] ?? '').trim() || null;
+  }
+
+  // Las fechas son opcionales: vacías se guardan como NULL
+  for (const [campo, nombre] of [['start_date', 'inicio'], ['end_date', 'fin']]) {
+    if (body[campo] === undefined) continue;
+    const valor = body[campo] ? String(body[campo]).slice(0, 10) : null;
+    if (valor && !fechaValida(valor)) return { error: `La fecha de ${nombre} no es válida`, campo };
+    datos[campo] = valor;
+  }
+  const inicio = 'start_date' in datos ? datos.start_date : actual?.start_date || null;
+  const fin    = 'end_date'   in datos ? datos.end_date   : actual?.end_date   || null;
+  if (inicio && fin && fin < inicio) {
+    return { error: 'La fecha de fin no puede ser anterior a la de inicio', campo: 'end_date' };
+  }
+
+  if (body.status !== undefined && body.status !== '') {
+    if (!ESTADOS_PROYECTO.includes(body.status)) return { error: 'Estado no válido', campo: 'status' };
+    datos.status = body.status;
+  }
+  if (body.color !== undefined && body.color !== '') {
+    if (!/^#[0-9a-f]{6}$/i.test(body.color)) return { error: 'Color no válido', campo: 'color' };
+    datos.color = body.color;
+  }
+
+  return { datos };
+}
+
 exports.create = async (req, res) => {
   try {
     // Igual que en la interfaz: solo administradores y coordinadores crean
@@ -124,9 +181,12 @@ exports.create = async (req, res) => {
       return res.status(403).json({ message: 'Solo administradores y coordinadores pueden crear proyectos' });
     }
 
-    const { name, description, objectives, start_date, end_date, status, color, members, presupuesto } = req.body;
+    // El presupuesto ya no se escribe al crear el proyecto: es la suma de sus
+    // partidas (se arma después del cronograma)
+    const { members } = req.body;
 
-    if (!name) return res.status(400).json({ message: 'El nombre es requerido' });
+    const { datos, error, campo } = limpiarProyecto(req.body, { crear: true });
+    if (error) return res.status(400).json({ message: error, campo });
 
     if (members?.some(m => m.role && !ROLES_PROYECTO.includes(m.role))) {
       return res.status(400).json({ message: 'Rol de miembro no válido' });
@@ -139,9 +199,10 @@ exports.create = async (req, res) => {
     try {
       await conn.beginTransaction();
       const [result] = await conn.query(
-        `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id, presupuesto)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, objectives, start_date, end_date, status || 'active', color || '#3B82F6', req.user.id, presupuesto || null]
+        `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [datos.name, datos.description ?? null, datos.objectives ?? null, datos.start_date ?? null,
+         datos.end_date ?? null, datos.status || 'active', datos.color || '#3B82F6', req.user.id]
       );
       projectId = result.insertId;
 
@@ -172,19 +233,15 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, objectives, start_date, end_date, status, color, presupuesto } = req.body;
+    const [[actual]] = await db.query('SELECT start_date, end_date FROM projects WHERE id = ?', [id]);
+    if (!actual) return res.status(404).json({ message: 'Proyecto no encontrado' });
 
-    const fields = [];
-    const values = [];
+    const { datos, error, campo } = limpiarProyecto(req.body, { actual });
+    if (error) return res.status(400).json({ message: error, campo });
 
-    if (name) { fields.push('name = ?'); values.push(name); }
-    if (description !== undefined) { fields.push('description = ?'); values.push(description); }
-    if (objectives !== undefined) { fields.push('objectives = ?'); values.push(objectives); }
-    if (start_date) { fields.push('start_date = ?'); values.push(start_date); }
-    if (end_date) { fields.push('end_date = ?'); values.push(end_date); }
-    if (status) { fields.push('status = ?'); values.push(status); }
-    if (color) { fields.push('color = ?'); values.push(color); }
-    if (presupuesto !== undefined) { fields.push('presupuesto = ?'); values.push(presupuesto || null); }
+    // Una fecha borrada en el formulario se guarda como NULL
+    const fields = Object.keys(datos).map(c => `${c} = ?`);
+    const values = Object.values(datos);
 
     if (!fields.length) return res.status(400).json({ message: 'Sin campos para actualizar' });
 
