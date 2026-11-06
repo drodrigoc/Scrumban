@@ -1,7 +1,7 @@
 ﻿const logger = require('../config/logger');
 const db = require('../config/database');
 const notificaciones = require('../services/notificaciones');
-const { permisosDeArchivo } = require('../middleware/auth');
+const { permisosDeArchivo, planificacionBloqueada, MENSAJE_BLOQUEO } = require('../middleware/auth');
 const { eliminarAdjunto } = require('./taskController');
 const auditoria = require('../services/auditoria');
 
@@ -58,7 +58,9 @@ exports.getAll = async (req, res) => {
         progress: proyecto.total_tasks > 0
           ? Math.round((proyecto.completed_tasks / proyecto.total_tasks) * 100)
           : (proyecto.progress || 0),
-        puede_editar: !proyecto.archived_at && (req.user.role === 'admin' || proyecto.owner_id === req.user.id),
+        puede_editar: !proyecto.archived_at && (req.user.role === 'admin'
+          || (proyecto.owner_id === req.user.id && !planificacionBloqueada(proyecto))),
+        bloqueado: planificacionBloqueada(proyecto),
         puede_archivar: permisos.archivar,
         puede_eliminar: permisos.eliminar,
       };
@@ -105,10 +107,19 @@ exports.getById = async (req, res) => {
 
     // Qué puede hacer quien consulta, para que la interfaz no ofrezca
     // acciones que el servidor va a rechazar
-    const { lectura, escritura, gestion, archivar, eliminar } = req.acceso;
+    const { lectura, escritura, gestion, planificacion, bloqueado, archivar, eliminar } = req.acceso;
+    let bloqueo = null;
+    if (bloqueado) {
+      const [[b]] = await db.query(
+        `SELECT p.bloqueada_at, u.name AS bloqueada_por_nombre
+           FROM projects p LEFT JOIN users u ON u.id = p.bloqueada_por WHERE p.id = ?`, [req.params.id]
+      );
+      bloqueo = b;
+    }
     res.json({
       ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo),
-      mi_acceso: { lectura, escritura, gestion, archivar, eliminar },
+      bloqueo,
+      mi_acceso: { lectura, escritura, gestion, planificacion, bloqueado, archivar, eliminar },
     });
   } catch (error) {
     logger.error(error);
@@ -170,6 +181,23 @@ function limpiarProyecto(body, { crear = false, actual = null } = {}) {
     datos.color = body.color;
   }
 
+  // POA: si el proyecto viene del Plan Operativo Anual se exige el texto de
+  // su aprobación; si no viene, no se pide ni se guarda
+  if (crear || body.es_poa !== undefined || body.poa_aprobacion !== undefined) {
+    const esPoa = body.es_poa !== undefined
+      ? [true, 1, '1', 'true'].includes(body.es_poa)
+      : Boolean(actual?.es_poa);
+    const aprobacion = body.poa_aprobacion !== undefined
+      ? (String(body.poa_aprobacion ?? '').trim() || null)
+      : (actual?.poa_aprobacion || null);
+    if (esPoa && !aprobacion) return { error: 'Escribe la aprobación del POA', campo: 'poa_aprobacion' };
+    if (aprobacion && aprobacion.length > 1000) {
+      return { error: 'La aprobación no puede pasar de 1000 caracteres', campo: 'poa_aprobacion' };
+    }
+    datos.es_poa = esPoa ? 1 : 0;
+    datos.poa_aprobacion = esPoa ? aprobacion : null;
+  }
+
   return { datos };
 }
 
@@ -199,10 +227,12 @@ exports.create = async (req, res) => {
     try {
       await conn.beginTransaction();
       const [result] = await conn.query(
-        `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO projects (name, description, objectives, start_date, end_date, status, color, owner_id,
+                               es_poa, poa_aprobacion)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [datos.name, datos.description ?? null, datos.objectives ?? null, datos.start_date ?? null,
-         datos.end_date ?? null, datos.status || 'active', datos.color || '#3B82F6', req.user.id]
+         datos.end_date ?? null, datos.status || 'active', datos.color || '#3B82F6', req.user.id,
+         datos.es_poa, datos.poa_aprobacion]
       );
       projectId = result.insertId;
 
@@ -221,20 +251,42 @@ exports.create = async (req, res) => {
     const [projects] = await db.query('SELECT * FROM projects WHERE id = ?', [projectId]);
     auditoria.registrar(req, {
       accion: 'proyecto_creado', entidad: 'proyecto', entidadId: projectId, entidadNombre: projects[0].name,
-      detalle: members?.length ? `${members.length} miembro(s) iniciales` : null,
+      detalle: [
+        datos.es_poa ? `POA: ${datos.poa_aprobacion}` : null,
+        members?.length ? `${members.length} miembro(s) iniciales` : null,
+      ].filter(Boolean).join('; ') || null,
     });
     res.status(201).json(projects[0]);
   } catch (error) {
+    if (faltaColumnaPoa(res, error)) return;
     logger.error(error);
     res.status(500).json({ message: 'Error al crear proyecto' });
   }
 };
 
+// Si el servidor ya tiene el código nuevo pero la base de datos no tiene
+// las columnas del POA, se dice qué falta en lugar de un error genérico
+function faltaColumnaPoa(res, error) {
+  if (error.code !== 'ER_BAD_FIELD_ERROR' || !/es_poa|poa_aprobacion/.test(error.message)) return false;
+  res.status(503).json({
+    message: 'Falta actualizar la base de datos: carga database/actualizaciones/2026-11-08_proyectos_poa.sql',
+  });
+  return true;
+}
+
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
-    const [[actual]] = await db.query('SELECT start_date, end_date FROM projects WHERE id = ?', [id]);
+    const [[actual]] = await db.query(
+      'SELECT start_date, end_date, es_poa, poa_aprobacion FROM projects WHERE id = ?', [id]
+    );
     if (!actual) return res.status(404).json({ message: 'Proyecto no encontrado' });
+
+    // Planificación POA bloqueada: solo se puede cambiar el estado
+    // (activo, pausado, completado…), que es seguimiento y no plan
+    if (req.acceso && !req.acceso.planificacion && Object.keys(req.body).some(c => c !== 'status')) {
+      return res.status(403).json({ message: MENSAJE_BLOQUEO, bloqueado: true });
+    }
 
     const { datos, error, campo } = limpiarProyecto(req.body, { actual });
     if (error) return res.status(400).json({ message: error, campo });
@@ -251,6 +303,7 @@ exports.update = async (req, res) => {
     const [projects] = await db.query('SELECT * FROM projects WHERE id = ?', [id]);
     res.json(projects[0]);
   } catch (error) {
+    if (faltaColumnaPoa(res, error)) return;
     logger.error(error);
     res.status(500).json({ message: 'Error al actualizar proyecto' });
   }

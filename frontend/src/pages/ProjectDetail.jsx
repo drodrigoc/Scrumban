@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { projectsAPI, usersAPI, unitsAPI } from '../services/api';
-import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, UserCog } from 'lucide-react';
+import { projectsAPI, usersAPI, unitsAPI, poaAPI } from '../services/api';
+import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, UserCog, Lock, Unlock } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import BudgetPanel from '../components/projects/BudgetPanel';
@@ -105,6 +105,25 @@ export default function ProjectDetail() {
   // Editar el proyecto, sus miembros, presupuesto y fases: lo decide el
   // servidor según el rol en el proyecto (mi_acceso.gestion)
   const canEdit = Boolean(project.mi_acceso?.gestion);
+  // Planificación (datos, alineación, cronograma, partidas): se cierra si la
+  // administración bloqueó este proyecto POA. El administrador puede siempre.
+  const canPlan   = Boolean(project.mi_acceso?.planificacion);
+  const bloqueado = Boolean(project.mi_acceso?.bloqueado);
+  const esAdmin   = user?.role === 'admin';
+  const puedeBloquear = esAdmin && Boolean(project.es_poa) && !project.archived_at;
+
+  const cambiarBloqueo = async (bloquear) => {
+    if (bloquear && !confirm('¿Bloquear la planificación de este proyecto POA?\n\n'
+      + 'Su dueño y sus coordinadores ya no podrán cambiar los datos, la alineación estratégica, '
+      + 'el cronograma ni las partidas del presupuesto. Las tareas y la ejecución siguen abiertas.')) return;
+    try {
+      await poaAPI.bloqueo(project.id, bloquear);
+      await recargar();
+      toast.success(bloquear ? 'Planificación bloqueada' : 'Planificación desbloqueada');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo cambiar el bloqueo');
+    }
+  };
 
   const views = [
     { to: `/projects/${id}/backlog`,   icon: List,             label: 'Backlog' },
@@ -127,18 +146,57 @@ export default function ProjectDetail() {
               <div className="w-4 h-4 rounded-full" style={{ backgroundColor: project.color }} />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{project.name}</h1>
               <span className={`badge ${st.color}`}>{st.label}</span>
+              {Boolean(project.es_poa) && (
+                <span className="badge bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">POA</span>
+              )}
             </div>
             {project.description && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">{project.description}</p>
             )}
+            {Boolean(project.es_poa) && project.poa_aprobacion && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+                <span className="font-medium">Aprobación del POA:</span> {project.poa_aprobacion}
+              </p>
+            )}
           </div>
         </div>
-        {canEdit && (
-          <button onClick={() => setShowEditModal(true)} className="btn-secondary">
-            <Edit className="w-4 h-4" /> Editar
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {puedeBloquear && !bloqueado && (
+            <button onClick={() => cambiarBloqueo(true)} className="btn-secondary"
+              title="Congela la planificación de este proyecto POA">
+              <Lock className="w-4 h-4" /> Bloquear planificación
+            </button>
+          )}
+          {canEdit && (
+            <button onClick={() => setShowEditModal(true)} className="btn-secondary">
+              <Edit className="w-4 h-4" /> {canPlan ? 'Editar' : 'Cambiar estado'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {bloqueado && !project.archived_at && (
+        <div className="flex flex-wrap items-start gap-3 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700/40 bg-indigo-50 dark:bg-indigo-900/20">
+          <Lock className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0 text-sm text-indigo-800 dark:text-indigo-200 space-y-0.5">
+            <p className="font-medium">
+              Planificación POA bloqueada
+              {project.bloqueo?.bloqueada_at && ` el ${new Date(project.bloqueo.bloqueada_at).toLocaleDateString('es-SV', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+              {project.bloqueo?.bloqueada_por_nombre && ` por ${project.bloqueo.bloqueada_por_nombre}`}
+            </p>
+            <p className="text-indigo-700/90 dark:text-indigo-300/90">
+              {esAdmin
+                ? 'Para los demás ya no se pueden cambiar los datos, la alineación, el cronograma ni las partidas. Como administrador puedes seguir editando.'
+                : 'Ya no se pueden cambiar los datos, la alineación estratégica, el cronograma ni las partidas del presupuesto. Las tareas, sus costos y las evidencias siguen abiertas.'}
+            </p>
+          </div>
+          {puedeBloquear && (
+            <button onClick={() => cambiarBloqueo(false)} className="btn-secondary text-sm py-1.5">
+              <Unlock className="w-4 h-4" /> Desbloquear
+            </button>
+          )}
+        </div>
+      )}
 
       {project.archived_at && (
         <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20">
@@ -196,19 +254,19 @@ export default function ProjectDetail() {
 
       {/* Alineación con el Plan Estratégico Institucional: a qué actividades
           del plan responde el proyecto y si ya se cumplieron */}
-      <AlineacionPanel projectId={id} canEdit={canEdit} />
+      <AlineacionPanel projectId={id} canEdit={canEdit} canPlanificar={canPlan} />
 
       {/* Cronograma macro — fases del proyecto */}
       <PhasesPanel
         projectId={id}
-        canEdit={canEdit}
+        canEdit={canPlan}
         projectStart={project.start_date}
         projectEnd={project.end_date}
       />
 
       {/* Presupuesto: partidas, ejecutado y disponible (reemplaza al antiguo
           "Control de Gastos", que usaba un monto escrito al crear el proyecto) */}
-      <BudgetPanel projectId={id} canEdit={canEdit} />
+      <BudgetPanel projectId={id} canEdit={canPlan} soloEjecucion={canEdit && !canPlan} />
 
       {/* Members */}
       <div className="card p-5">
@@ -300,7 +358,8 @@ export default function ProjectDetail() {
 
       {showEditModal && (
         <Modal title="Editar Proyecto" onClose={() => setShowEditModal(false)}>
-          <ProjectForm project={project} users={allUsers} onSave={handleUpdate} onCancel={() => setShowEditModal(false)} />
+          <ProjectForm project={project} users={allUsers} soloEstado={!canPlan}
+            onSave={handleUpdate} onCancel={() => setShowEditModal(false)} />
         </Modal>
       )}
 

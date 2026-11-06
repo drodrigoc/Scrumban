@@ -61,12 +61,18 @@ CREATE TABLE projects (
   gdrive_folder_id VARCHAR(255) DEFAULT NULL,
   color       VARCHAR(7) DEFAULT '#3B82F6',
   presupuesto DECIMAL(14,2) DEFAULT NULL,
+  es_poa      TINYINT(1)    NOT NULL DEFAULT 0,      -- viene del Plan Operativo Anual
+  poa_aprobacion VARCHAR(1000) DEFAULT NULL,           -- texto de la aprobación del POA
+  planificacion_bloqueada TINYINT(1) NOT NULL DEFAULT 0, -- el administrador congeló la planificación
+  bloqueada_at DATETIME DEFAULT NULL,
+  bloqueada_por INT DEFAULT NULL,
   archived_at DATETIME DEFAULT NULL,
   archived_by INT DEFAULT NULL,
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (owner_id)    REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (archived_by) REFERENCES users(id) ON DELETE SET NULL
+  FOREIGN KEY (archived_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_projects_bloqueada_por FOREIGN KEY (bloqueada_por) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- 4. Miembros de proyecto

@@ -50,6 +50,15 @@ export const auditoriaAPI = {
 
 // Plan Estratégico Institucional: catálogo, tablero y alineación de proyectos
 const RUTA_NIVEL = { linea: 'lineas', accion: 'acciones', actividad: 'actividades' };
+// Control del POA (solo administradores)
+export const poaAPI = {
+  listar:           ()                  => api.get('/poa'),
+  bloqueo:          (projectId, valor)  => api.put(`/poa/proyectos/${projectId}/bloqueo`, { bloqueado: valor }),
+  bloquearTodos:    ()                  => api.post('/poa/bloquear-todos'),
+  desbloquearTodos: ()                  => api.post('/poa/desbloquear-todos'),
+  programarCierre:  (fecha)             => api.put('/poa/cierre', { fecha }),
+};
+
 export const peiAPI = {
   arbol:        ()                  => api.get('/pei'),
   tablero:      (params)            => api.get('/pei/tablero', { params }),

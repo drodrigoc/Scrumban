@@ -52,6 +52,7 @@ app.use('/api/my-tasks',  require('./routes/myTasks'));
 app.use('/api/settings',  require('./routes/settings'));
 app.use('/api/auditoria', require('./routes/auditoria'));
 app.use('/api/pei',       require('./routes/pei'));
+app.use('/api/poa',       require('./routes/poa'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -102,6 +103,7 @@ app.listen(PORT, HOST, () => {
 
   // La bitácora de auditoría conserva un año
   require('./services/auditoria').iniciarDepuracion();
+  require('./services/poaCierre').iniciar();
 
   // Dónde van a parar los adjuntos, visible desde el arranque
   const gdrive = require('./services/gdrive');

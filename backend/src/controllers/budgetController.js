@@ -1,5 +1,6 @@
 const logger = require('../config/logger');
 const db     = require('../config/database');
+const { MENSAJE_BLOQUEO } = require('../middleware/auth');
 
 const TIPOS = ['fijo', 'variable'];
 
@@ -177,6 +178,13 @@ exports.update = async (req, res) => {
       [itemId, id]
     );
     if (!actual) return res.status(404).json({ message: 'Partida no encontrada' });
+
+    // Planificación POA bloqueada: solo se registra el ejecutado de las
+    // partidas fijas (salarios que se pagan cada mes); lo demás es plan
+    if (req.acceso && !req.acceso.planificacion) {
+      const soloEjecutado = actual.tipo === 'fijo' && Object.keys(req.body).every(c => c === 'monto_ejecutado');
+      if (!soloEjecutado) return res.status(403).json({ message: MENSAJE_BLOQUEO, bloqueado: true });
+    }
 
     const tipoFinal = tipo || actual.tipo;
 
