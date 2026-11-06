@@ -86,13 +86,45 @@ function permisosDeArchivo(user, proyecto, rol) {
   return { archivar, eliminar: archivar && Boolean(proyecto.archived_at) };
 }
 
-async function accesoAProyecto(user, projectId) {
-  const [[proyecto]] = await db.query(
+// Si la base todavía no tiene las columnas del POA (falta cargar la
+// actualización 2026-11-08), los permisos se calculan como antes en lugar
+// de romper todas las rutas de proyectos
+let hayColumnasPoa = true;
+
+async function leerProyecto(projectId) {
+  if (hayColumnasPoa) {
+    try {
+      const [[p]] = await db.query(
+        `SELECT p.owner_id, p.archived_at, p.es_poa, p.planificacion_bloqueada, u.unit AS owner_unit
+           FROM projects p LEFT JOIN users u ON u.id = p.owner_id
+          WHERE p.id = ?`,
+        [projectId]
+      );
+      return p;
+    } catch (err) {
+      if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+      hayColumnasPoa = false;
+    }
+  }
+  const [[p]] = await db.query(
     `SELECT p.owner_id, p.archived_at, u.unit AS owner_unit
        FROM projects p LEFT JOIN users u ON u.id = p.owner_id
       WHERE p.id = ?`,
     [projectId]
   );
+  return p;
+}
+
+/**
+ * Planificación de un proyecto POA bloqueada por la administración: nadie
+ * salvo un administrador cambia sus datos, alineación estratégica,
+ * cronograma macro ni las partidas del presupuesto. La ejecución sigue
+ * abierta (tareas, costos, evidencias, ejecutado de partidas fijas).
+ */
+const planificacionBloqueada = (p) => Boolean(p?.es_poa) && Boolean(p?.planificacion_bloqueada);
+
+async function accesoAProyecto(user, projectId) {
+  const proyecto = await leerProyecto(projectId);
   if (!proyecto) return null;
 
   const [[miembro]] = await db.query(
@@ -109,10 +141,16 @@ async function accesoAProyecto(user, projectId) {
   const gestion = user.role === 'admin' || esDueno || rol === 'coordinator' || (user.role === 'coordinator' && Boolean(rol));
   const escritura = gestion || (Boolean(rol) && rol !== 'viewer');
 
+  const bloqueado = planificacionBloqueada(proyecto);
+
   return {
     lectura,
     escritura: escritura && !archivado,
     gestion:   gestion && !archivado,
+    // Cambiar la planificación: como gestión, salvo que esté bloqueada
+    // (el administrador puede siempre)
+    planificacion: gestion && !archivado && (!bloqueado || user.role === 'admin'),
+    bloqueado,
     archivado,
     ...permisos,
   };
@@ -122,7 +160,11 @@ const MENSAJES_ACCESO = {
   lectura:   'Sin acceso a este proyecto',
   escritura: 'No tienes permiso para modificar este proyecto',
   gestion:   'Solo el dueño o un coordinador del proyecto puede hacer esto',
+  planificacion: 'Solo el dueño o un coordinador del proyecto puede hacer esto',
 };
+
+const MENSAJE_BLOQUEO = 'La planificación de este proyecto POA está bloqueada por la administración. '
+  + 'Pide a un administrador que la desbloquee si necesitas cambiarla.';
 
 /**
  * Exige un nivel de acceso sobre el proyecto de la URL
@@ -145,8 +187,10 @@ const requireProjectAccess = (nivel) => async (req, res, next) => {
     if (!req.acceso[nivel]) {
       const message = req.acceso.archivado && req.acceso.lectura
         ? 'El proyecto está archivado: restáuralo para modificarlo'
-        : MENSAJES_ACCESO[nivel];
-      return res.status(403).json({ message });
+        : nivel === 'planificacion' && req.acceso.gestion && req.acceso.bloqueado
+          ? MENSAJE_BLOQUEO
+          : MENSAJES_ACCESO[nivel];
+      return res.status(403).json({ message, ...(nivel === 'planificacion' && req.acceso.bloqueado && { bloqueado: true }) });
     }
     next();
   } catch (error) {
@@ -186,4 +230,5 @@ const authorizeSGC = (req, res, next) => {
 module.exports = {
   authenticate, authorize, authorizeSGC,
   accesoAProyecto, permisosDeArchivo, requireProjectAccess, requireTaskInProject,
+  planificacionBloqueada, MENSAJE_BLOQUEO,
 };

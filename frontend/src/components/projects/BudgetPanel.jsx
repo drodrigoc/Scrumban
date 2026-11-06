@@ -92,7 +92,10 @@ const emptyForm = {
   monto_estimado: '', monto_ejecutado: '', fecha: '',
 };
 
-export default function BudgetPanel({ projectId, canEdit }) {
+// canEdit: armar el presupuesto (crear, editar y eliminar partidas).
+// soloEjecucion: la planificación del proyecto POA está bloqueada; solo se
+// registra el ejecutado de las partidas fijas.
+export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false }) {
   const [data, setData]         = useState(null);
   const [error, setError]       = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -148,6 +151,22 @@ export default function BudgetPanel({ projectId, canEdit }) {
   };
 
   const handleSave = async () => {
+    if (soloEjecucion) {
+      setSaving(true);
+      try {
+        await budgetAPI.update(projectId, editingId, {
+          monto_ejecutado: form.monto_ejecutado === '' ? 0 : parseFloat(form.monto_ejecutado),
+        });
+        toast.success('Ejecutado registrado');
+        await load();
+        closeForm();
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'No se pudo registrar el ejecutado');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     if (!form.categoria.trim()) {
       toast.error('La categoría es requerida');
       return;
@@ -206,7 +225,8 @@ export default function BudgetPanel({ projectId, canEdit }) {
   const fijos      = items.filter(i => i.tipo === 'fijo');
   const variables  = items.filter(i => i.tipo === 'variable');
   const hayDatos   = items.length > 0 || sinPartida.total > 0;
-  const columnas   = canEdit ? 6 : 5;
+  const conAcciones = canEdit || soloEjecucion;
+  const columnas   = conAcciones ? 6 : 5;
 
   return (
     <div className="card p-5 space-y-5">
@@ -242,8 +262,40 @@ export default function BudgetPanel({ projectId, canEdit }) {
       {/* Resumen */}
       {summary && hayDatos && <Resumen summary={summary} />}
 
+      {soloEjecucion && (
+        <p className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg px-3 py-2">
+          Planificación bloqueada: las partidas ya no se modifican. Puedes registrar el ejecutado de las partidas fijas;
+          el de las variables sale del costo de las tareas.
+        </p>
+      )}
+
+      {/* Registrar el ejecutado de una fija con la planificación bloqueada */}
+      {showForm && soloEjecucion && (
+        <div className="rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/40 dark:bg-primary-900/10 p-4 space-y-3">
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+            Registrar ejecutado · {form.categoria}
+          </p>
+          <div className="max-w-xs">
+            <label className="label">Monto ejecutado</label>
+            <input
+              type="number" min="0" step="0.01" className="input" placeholder="0.00" autoFocus
+              value={form.monto_ejecutado}
+              onChange={e => setForm({ ...form, monto_ejecutado: e.target.value })}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={closeForm} className="btn-secondary text-sm py-1.5 px-4">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-1.5 px-4">
+              {saving
+                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Formulario */}
-      {showForm && (
+      {showForm && !soloEjecucion && (
         <div className="rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/40 dark:bg-primary-900/10 p-4 space-y-3">
           <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
             {editingId ? 'Editar partida' : 'Nueva partida'}
@@ -344,18 +396,18 @@ export default function BudgetPanel({ projectId, canEdit }) {
                 <th className="py-2 px-2 font-medium text-right">Estimado</th>
                 <th className="py-2 px-2 font-medium text-right">Ejecutado</th>
                 <th className="py-2 px-2 font-medium text-right">Disponible</th>
-                {canEdit && <th className="py-2 px-2" />}
+                {conAcciones && <th className="py-2 px-2" />}
               </tr>
             </thead>
             <tbody>
               {fijos.length > 0 && (
                 <Grupo titulo="Costos fijos" rows={fijos} columnas={columnas}
-                  canEdit={canEdit} abiertas={abiertas} alternar={alternar}
+                  canEdit={canEdit} soloEjecucion={soloEjecucion} abiertas={abiertas} alternar={alternar}
                   onEdit={openEdit} onDelete={handleDelete} />
               )}
               {(variables.length > 0 || sinPartida.total > 0) && (
                 <Grupo titulo="Costos variables" rows={variables} columnas={columnas}
-                  canEdit={canEdit} abiertas={abiertas} alternar={alternar}
+                  canEdit={canEdit} soloEjecucion={soloEjecucion} abiertas={abiertas} alternar={alternar}
                   onEdit={openEdit} onDelete={handleDelete}
                   sinPartida={sinPartida} />
               )}
@@ -491,7 +543,8 @@ function BotonTareas({ n, abierta, onClick }) {
   );
 }
 
-function Grupo({ titulo, rows, columnas, canEdit, abiertas, alternar, onEdit, onDelete, sinPartida }) {
+function Grupo({ titulo, rows, columnas, canEdit, soloEjecucion, abiertas, alternar, onEdit, onDelete, sinPartida }) {
+  const conAcciones = canEdit || soloEjecucion;
   const extra = sinPartida?.total || 0;
   const subEst = rows.reduce((s, r) => s + r.monto_estimado, 0);
   const subEje = rows.reduce((s, r) => s + r.ejecutado, 0) + extra;
@@ -538,23 +591,27 @@ function Grupo({ titulo, rows, columnas, canEdit, abiertas, alternar, onEdit, on
               <td className="py-2 px-2 text-right align-top">
                 <Disponible valor={item.disponible} />
               </td>
-              {canEdit && (
+              {conAcciones && (
                 <td className="py-2 px-2 align-top">
                   <div className="flex items-center gap-1 justify-end">
-                    <button
-                      onClick={() => onEdit(item)}
-                      title="Editar partida"
-                      className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(item)}
-                      title="Eliminar partida"
-                      className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {(canEdit || item.tipo === 'fijo') && (
+                      <button
+                        onClick={() => onEdit(item)}
+                        title={canEdit ? 'Editar partida' : 'Registrar ejecutado'}
+                        className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button
+                        onClick={() => onDelete(item)}
+                        title="Eliminar partida"
+                        className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               )}
@@ -587,7 +644,7 @@ function Grupo({ titulo, rows, columnas, canEdit, abiertas, alternar, onEdit, on
               />
             </td>
             <td className="py-2 px-2 text-right tabular-nums text-gray-400 align-top">—</td>
-            {canEdit && <td />}
+            {conAcciones && <td />}
           </tr>
           {abiertas.has('sin') && <ListaTareas tareas={sinPartida.tareas} columnas={columnas} />}
         </>
@@ -605,7 +662,7 @@ function Grupo({ titulo, rows, columnas, canEdit, abiertas, alternar, onEdit, on
         <td className="py-1.5 px-2 text-right text-sm font-semibold">
           <Disponible valor={subEst - subEje} />
         </td>
-        {canEdit && <td />}
+        {conAcciones && <td />}
       </tr>
     </>
   );

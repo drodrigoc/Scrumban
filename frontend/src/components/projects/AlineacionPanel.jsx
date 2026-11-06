@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
-  Target, Plus, Trash2, CheckCircle2, Circle, Link2, ListTodo, RotateCcw, Pencil, ChevronDown,
+  Target, Plus, Trash2, CheckCircle2, Circle, Link2, ListTodo, RotateCcw, Pencil, ChevronDown, MoreVertical,
 } from 'lucide-react';
 import { peiAPI, tasksAPI } from '../../services/api';
 import SelectorBuscable, { CampoSelector } from '../common/SelectorBuscable';
@@ -36,7 +36,10 @@ function agrupar(vinculos) {
   return lineas;
 }
 
-export default function AlineacionPanel({ projectId, canEdit }) {
+// canEdit: marcar cumplidas y registrar evidencia (ejecución).
+// canPlanificar: vincular y quitar actividades (planificación; se cierra si
+// la administración bloqueó el proyecto POA).
+export default function AlineacionPanel({ projectId, canEdit, canPlanificar = canEdit }) {
   const [datos, setDatos]     = useState(null);
   const [error, setError]     = useState(null);
   const [arbol, setArbol]     = useState(null);   // catálogo, al abrir el selector
@@ -208,7 +211,7 @@ export default function AlineacionPanel({ projectId, canEdit }) {
               {cumplidas} de {vinculos.length} cumplida{vinculos.length === 1 ? '' : 's'}
             </span>
           )}
-          {canEdit && (
+          {canPlanificar && (
             <button onClick={abrirVincular} className="btn-secondary text-xs py-1.5 px-3">
               <Plus className="w-3.5 h-3.5" /> Vincular actividad
             </button>
@@ -238,7 +241,7 @@ export default function AlineacionPanel({ projectId, canEdit }) {
       {vinculos.length === 0 ? (
         <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-4">
           Este proyecto todavía no está alineado con el plan estratégico.
-          {canEdit && ' Vincula las actividades estratégicas a las que responde con "Vincular actividad".'}
+          {canPlanificar && ' Vincula las actividades estratégicas a las que responde con "Vincular actividad".'}
         </p>
       ) : (
         <div className="space-y-4">
@@ -265,6 +268,7 @@ export default function AlineacionPanel({ projectId, canEdit }) {
                       key={v.id}
                       v={v}
                       canEdit={canEdit}
+                      canPlanificar={canPlanificar}
                       editando={editando?.id === v.id ? editando : null}
                       setEditando={setEditando}
                       erroresForm={erroresForm}
@@ -337,6 +341,52 @@ function Encabezado({ plan }) {
   );
 }
 
+function MenuActividad({ cumplido, onEditar, onReabrir, onQuitar }) {
+  const [abierto, setAbierto] = useState(false);
+  const elegir = (accion) => () => { setAbierto(false); accion(); };
+  const opcion = 'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700';
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto(a => !a)}
+        title="Más acciones"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {abierto && (
+        <>
+          {/* Clic fuera: cierra el menú */}
+          <div className="fixed inset-0 z-10" onClick={() => setAbierto(false)} />
+          <div role="menu"
+            className="absolute right-0 top-full mt-1 z-20 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1">
+            <button role="menuitem" onClick={elegir(onEditar)} className={`${opcion} text-gray-700 dark:text-gray-200`}>
+              <Pencil className="w-3.5 h-3.5" /> {cumplido ? 'Editar evidencia' : 'Agregar evidencia'}
+            </button>
+            {cumplido && (
+              <button role="menuitem" onClick={elegir(onReabrir)} className={`${opcion} text-gray-700 dark:text-gray-200`}>
+                <RotateCcw className="w-3.5 h-3.5" /> Reabrir (pendiente)
+              </button>
+            )}
+            {onQuitar && (
+              <>
+                <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                <button role="menuitem" onClick={elegir(onQuitar)} className={`${opcion} text-red-600 dark:text-red-400`}>
+                  <Trash2 className="w-3.5 h-3.5" /> Quitar del proyecto
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Bloque({ titulo, texto }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
@@ -347,7 +397,7 @@ function Bloque({ titulo, texto }) {
 }
 
 function Actividad({
-  v, canEdit, editando, setEditando, erroresForm, setErroresForm, guardando,
+  v, canEdit, canPlanificar, editando, setEditando, erroresForm, setErroresForm, guardando,
   onMarcar, onEditar, onGuardar, onReabrir, onQuitar, onElegirTarea,
 }) {
   return (
@@ -436,28 +486,21 @@ function Actividad({
         </div>
 
         {canEdit && !editando && (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {v.cumplido ? (
-              <>
-                <button onClick={onEditar} title="Editar evidencia"
-                  className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={onReabrir} title="Reabrir (marcar como pendiente)"
-                  className="p-1 text-gray-400 hover:text-amber-500">
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </>
-            ) : (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {!v.cumplido && (
               <button onClick={onMarcar}
-                className="text-xs font-medium text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded px-2 py-1">
+                className="text-xs font-medium text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md px-2 py-1">
                 Marcar cumplida
               </button>
             )}
-            <button onClick={onQuitar} title="Quitar del proyecto"
-              className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {/* Las demás acciones van en un menú aparte: "Quitar" no queda
+                junto a "Marcar cumplida", donde era fácil tocarlo por error */}
+            <MenuActividad
+              cumplido={v.cumplido}
+              onEditar={onEditar}
+              onReabrir={onReabrir}
+              onQuitar={canPlanificar ? onQuitar : null}
+            />
           </div>
         )}
       </div>

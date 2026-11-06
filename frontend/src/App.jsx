@@ -24,6 +24,7 @@ import MyTasks from './pages/MyTasks';
 import EmailSettings from './pages/EmailSettings';
 import Auditoria from './pages/Auditoria';
 import PlanEstrategico from './pages/PlanEstrategico';
+import ControlPOA from './pages/ControlPOA';
 import NotFound from './pages/NotFound';
 
 function PrivateRoute({ children, roles, allowSGC }) {
@@ -82,6 +83,11 @@ function AppRoutes() {
         <Route path="settings/email" element={
           <PrivateRoute roles={['admin']}>
             <EmailSettings />
+          </PrivateRoute>
+        } />
+        <Route path="poa" element={
+          <PrivateRoute roles={['admin']}>
+            <ControlPOA />
           </PrivateRoute>
         } />
         <Route path="auditoria" element={

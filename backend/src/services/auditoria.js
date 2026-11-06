@@ -39,6 +39,11 @@ const ACCIONES = {
   pei_desvinculada:           { categoria: 'proyectos',     etiqueta: 'Actividad estratégica desvinculada' },
   pei_cumplida:               { categoria: 'proyectos',     etiqueta: 'Actividad estratégica cumplida' },
   pei_reabierta:              { categoria: 'proyectos',     etiqueta: 'Actividad estratégica reabierta' },
+  poa_bloqueado:              { categoria: 'proyectos',     etiqueta: 'Planificación POA bloqueada' },
+  poa_desbloqueado:           { categoria: 'proyectos',     etiqueta: 'Planificación POA desbloqueada' },
+  poa_bloqueo_masivo:         { categoria: 'proyectos',     etiqueta: 'Todos los proyectos POA bloqueados' },
+  poa_desbloqueo_masivo:      { categoria: 'proyectos',     etiqueta: 'Todos los proyectos POA desbloqueados' },
+  poa_cierre_programado:      { categoria: 'proyectos',     etiqueta: 'Cierre del POA programado' },
 
   correo_conectado:           { categoria: 'configuracion', etiqueta: 'Cuenta de correo conectada' },
   correo_desconectado:        { categoria: 'configuracion', etiqueta: 'Cuenta de correo desconectada' },

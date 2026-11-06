@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { projectsAPI, usersAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Search, FolderKanban, Calendar, Users, MoreVertical, Edit, Trash2, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, Search, FolderKanban, Calendar, Users, MoreVertical, Edit, Trash2, Archive, ArchiveRestore, Lock } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import { useArchivoProyecto } from '../components/projects/AccionesArchivo';
@@ -154,6 +154,12 @@ export default function Projects() {
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{p.name}</h3>
                   </div>
                   <div className="relative z-10 flex items-center gap-1 ml-2 flex-shrink-0">
+                    {Boolean(p.es_poa) && (
+                      <span className="badge bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                        title={(p.bloqueado ? 'Planificación bloqueada. ' : '') + (p.poa_aprobacion || 'Viene del POA')}>
+                        {p.bloqueado && <Lock className="inline w-3 h-3 mr-0.5 -mt-0.5" />}POA
+                      </span>
+                    )}
                     <span className={`badge ${st.color}`}>{st.label}</span>
                     {(p.puede_editar || p.puede_archivar) && (
                       <div className="relative">
