@@ -35,6 +35,10 @@ const ACCIONES = {
   miembro_agregado:           { categoria: 'proyectos',     etiqueta: 'Miembro agregado' },
   miembro_quitado:            { categoria: 'proyectos',     etiqueta: 'Miembro quitado' },
   rol_miembro_cambiado:       { categoria: 'proyectos',     etiqueta: 'Rol de miembro cambiado' },
+  pei_vinculada:              { categoria: 'proyectos',     etiqueta: 'Actividad estratégica vinculada' },
+  pei_desvinculada:           { categoria: 'proyectos',     etiqueta: 'Actividad estratégica desvinculada' },
+  pei_cumplida:               { categoria: 'proyectos',     etiqueta: 'Actividad estratégica cumplida' },
+  pei_reabierta:              { categoria: 'proyectos',     etiqueta: 'Actividad estratégica reabierta' },
 
   correo_conectado:           { categoria: 'configuracion', etiqueta: 'Cuenta de correo conectada' },
   correo_desconectado:        { categoria: 'configuracion', etiqueta: 'Cuenta de correo desconectada' },
@@ -43,6 +47,10 @@ const ACCIONES = {
   sgc_catalogo_creado:        { categoria: 'sgc',           etiqueta: 'Elemento del catálogo SGC creado' },
   sgc_catalogo_modificado:    { categoria: 'sgc',           etiqueta: 'Elemento del catálogo SGC modificado' },
   sgc_catalogo_eliminado:     { categoria: 'sgc',           etiqueta: 'Elemento del catálogo SGC eliminado' },
+
+  pei_catalogo_creado:        { categoria: 'pei',           etiqueta: 'Elemento del plan estratégico creado' },
+  pei_catalogo_modificado:    { categoria: 'pei',           etiqueta: 'Elemento del plan estratégico modificado' },
+  pei_catalogo_eliminado:     { categoria: 'pei',           etiqueta: 'Elemento del plan estratégico eliminado' },
 };
 
 const CATEGORIAS = {
@@ -51,6 +59,7 @@ const CATEGORIAS = {
   proyectos:     'Proyectos',
   configuracion: 'Configuración',
   sgc:           'Catálogo SGC',
+  pei:           'Plan estratégico',
 };
 
 // Si no se da el nombre de lo modificado, se busca aquí

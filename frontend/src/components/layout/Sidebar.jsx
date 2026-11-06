@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, FolderKanban, Users, LogOut, X, UsersRound, Building2, Landmark, ShieldCheck, CheckSquare, Mail, ScrollText } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Users, LogOut, X, UsersRound, Building2, Landmark, ShieldCheck, CheckSquare, Mail, ScrollText, Target } from 'lucide-react';
 import logo from '../../assets/logousocompleto.png';
 
 const navItems = [
@@ -75,6 +75,10 @@ export default function Sidebar({ open, onClose }) {
               <NavLink to="/team" className={linkClass}>
                 <UsersRound className="w-4 h-4 flex-shrink-0" />
                 Seguimiento de Equipo
+              </NavLink>
+              <NavLink to="/plan-estrategico" className={linkClass}>
+                <Target className="w-4 h-4 flex-shrink-0" />
+                Plan estratégico
               </NavLink>
             </>
           )}

@@ -17,6 +17,7 @@ const COLOR_CATEGORIA = {
   proyectos:     'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
   configuracion: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   sgc:           'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  pei:           'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 };
 const COLOR_FALLO = 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300';
 

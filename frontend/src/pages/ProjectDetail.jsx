@@ -7,6 +7,7 @@ import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import BudgetPanel from '../components/projects/BudgetPanel';
 import PhasesPanel from '../components/projects/PhasesPanel';
+import AlineacionPanel from '../components/projects/AlineacionPanel';
 import { useAuth } from '../context/AuthContext';
 import { useArchivoProyecto } from '../components/projects/AccionesArchivo';
 
@@ -192,6 +193,10 @@ export default function ProjectDetail() {
           ))}
         </div>
       </div>
+
+      {/* Alineación con el Plan Estratégico Institucional: a qué actividades
+          del plan responde el proyecto y si ya se cumplieron */}
+      <AlineacionPanel projectId={id} canEdit={canEdit} />
 
       {/* Cronograma macro — fases del proyecto */}
       <PhasesPanel

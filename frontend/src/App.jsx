@@ -23,6 +23,7 @@ import SGCAdmin from './pages/SGCAdmin';
 import MyTasks from './pages/MyTasks';
 import EmailSettings from './pages/EmailSettings';
 import Auditoria from './pages/Auditoria';
+import PlanEstrategico from './pages/PlanEstrategico';
 import NotFound from './pages/NotFound';
 
 function PrivateRoute({ children, roles, allowSGC }) {
@@ -61,6 +62,11 @@ function AppRoutes() {
         <Route path="team" element={
           <PrivateRoute roles={['admin', 'coordinator', 'superViewer']}>
             <TeamView />
+          </PrivateRoute>
+        } />
+        <Route path="plan-estrategico" element={
+          <PrivateRoute roles={['admin', 'coordinator', 'superViewer']}>
+            <PlanEstrategico />
           </PrivateRoute>
         } />
         <Route path="units" element={
