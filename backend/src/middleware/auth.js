@@ -123,14 +123,42 @@ async function leerProyecto(projectId) {
  */
 const planificacionBloqueada = (p) => Boolean(p?.es_poa) && Boolean(p?.planificacion_bloqueada);
 
+// Igual que con el POA: sin la columna (falta la actualización 2026-11-09)
+// nadie tiene costos fijos delegados, pero las rutas siguen funcionando
+let hayColumnaFijos = true;
+
+async function leerMiembro(projectId, userId) {
+  if (hayColumnaFijos) {
+    try {
+      const [[m]] = await db.query(
+        'SELECT role, ver_costos_fijos FROM project_members WHERE project_id = ? AND user_id = ?',
+        [projectId, userId]
+      );
+      return m;
+    } catch (err) {
+      if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+      hayColumnaFijos = false;
+    }
+  }
+  const [[m]] = await db.query(
+    'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?', [projectId, userId]
+  );
+  return m;
+}
+
+/*
+ * Costos fijos (salarios, prestaciones): información reservada.
+ *   - Los ven el administrador, el coordinador y el Super Visor del sistema.
+ *   - El administrador o el coordinador del sistema pueden delegarlos a un
+ *     coordinador de un proyecto concreto (project_members.ver_costos_fijos).
+ */
+const ROLES_COSTOS_FIJOS = ['admin', 'coordinator', 'superViewer'];
+
 async function accesoAProyecto(user, projectId) {
   const proyecto = await leerProyecto(projectId);
   if (!proyecto) return null;
 
-  const [[miembro]] = await db.query(
-    'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
-    [projectId, user.id]
-  );
+  const miembro = await leerMiembro(projectId, user.id);
   const esDueno = proyecto.owner_id === user.id;
   const rol = miembro?.role || null;
   const archivado = Boolean(proyecto.archived_at);
@@ -151,6 +179,11 @@ async function accesoAProyecto(user, projectId) {
     // (el administrador puede siempre)
     planificacion: gestion && !archivado && (!bloqueado || user.role === 'admin'),
     bloqueado,
+    costosFijos: ROLES_COSTOS_FIJOS.includes(user.role)
+      || (rol === 'coordinator' && Boolean(miembro?.ver_costos_fijos)),
+    // Delegar los costos fijos a un coordinador del proyecto: administrador o
+    // coordinador del sistema que gestiona el proyecto
+    delegarFijos: ['admin', 'coordinator'].includes(user.role) && gestion && !archivado,
     archivado,
     ...permisos,
   };

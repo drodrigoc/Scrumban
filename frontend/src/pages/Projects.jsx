@@ -8,6 +8,7 @@ import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import { useArchivoProyecto } from '../components/projects/AccionesArchivo';
 import { diaLocal } from '../utils/fechas';
+import { separarObjetivos } from '../utils/objetivos';
 
 const statusConfig = {
   active:    { label: 'Activo',     color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -219,8 +220,11 @@ export default function Projects() {
                   </p>
                 )}
 
-                {p.description && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{p.description}</p>
+                {/* La descripción ya no se pide: los proyectos nuevos muestran su primer objetivo */}
+                {(p.description || separarObjetivos(p.objectives)[0]) && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
+                    {p.description || separarObjetivos(p.objectives)[0]}
+                  </p>
                 )}
 
                 <div className="mb-3">
@@ -257,7 +261,7 @@ export default function Projects() {
       {archivo.modal}
 
       {showModal && (
-        <Modal title={editing ? 'Editar Proyecto' : 'Nuevo Proyecto'} onClose={() => { setShowModal(false); setEditing(null); }}>
+        <Modal title={editing ? 'Editar Proyecto' : 'Nuevo Proyecto'} size="lg" onClose={() => { setShowModal(false); setEditing(null); }}>
           <ProjectForm project={editing} users={users} onSave={handleSave} onCancel={() => { setShowModal(false); setEditing(null); }} />
         </Modal>
       )}

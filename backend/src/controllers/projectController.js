@@ -87,11 +87,7 @@ exports.getById = async (req, res) => {
     // El acceso ya lo verificó la ruta (requireProjectAccess)
 
     // Obtener miembros
-    const [members] = await db.query(
-      `SELECT u.id, u.name, u.email, u.avatar, u.unit, u.role as system_role, pm.role as project_role
-       FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ?`,
-      [req.params.id]
-    );
+    const members = await leerMiembros(req.params.id);
 
     // Contar tareas por estado
     const [taskStats] = await db.query(
@@ -107,7 +103,7 @@ exports.getById = async (req, res) => {
 
     // Qué puede hacer quien consulta, para que la interfaz no ofrezca
     // acciones que el servidor va a rechazar
-    const { lectura, escritura, gestion, planificacion, bloqueado, archivar, eliminar } = req.acceso;
+    const { lectura, escritura, gestion, planificacion, bloqueado, costosFijos, delegarFijos, archivar, eliminar } = req.acceso;
     let bloqueo = null;
     if (bloqueado) {
       const [[b]] = await db.query(
@@ -119,13 +115,31 @@ exports.getById = async (req, res) => {
     res.json({
       ...project, members, taskStats, total_costo: parseFloat(costResult[0].total_costo),
       bloqueo,
-      mi_acceso: { lectura, escritura, gestion, planificacion, bloqueado, archivar, eliminar },
+      mi_acceso: { lectura, escritura, gestion, planificacion, bloqueado, costosFijos, delegarFijos, archivar, eliminar },
     });
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al obtener proyecto' });
   }
 };
+
+// Miembros del proyecto, con su permiso de costos fijos si la base ya lo tiene
+async function leerMiembros(projectId) {
+  const columnas = 'u.id, u.name, u.email, u.avatar, u.unit, u.role as system_role, pm.role as project_role';
+  try {
+    const [m] = await db.query(
+      `SELECT ${columnas}, pm.ver_costos_fijos
+         FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ?`, [projectId]
+    );
+    return m.map(x => ({ ...x, ver_costos_fijos: Boolean(x.ver_costos_fijos) }));
+  } catch (err) {
+    if (err.code !== 'ER_BAD_FIELD_ERROR') throw err;
+    const [m] = await db.query(
+      `SELECT ${columnas} FROM project_members pm JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ?`, [projectId]
+    );
+    return m;
+  }
+}
 
 // ── Validación de los datos del proyecto ─────────────────────────────────
 // El formulario manda los campos vacíos como '' (por ejemplo, una fecha sin
@@ -451,6 +465,13 @@ exports.updateMemberRole = async (req, res) => {
       'UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?',
       [role, id, userId]
     );
+    // Los costos fijos delegados son para coordinadores: si deja de serlo,
+    // pierde el permiso (y no vuelve solo si lo nombran otra vez)
+    if (role !== 'coordinator') {
+      await db.query(
+        'UPDATE project_members SET ver_costos_fijos = 0 WHERE project_id = ? AND user_id = ?', [id, userId]
+      ).catch(err => { if (err.code !== 'ER_BAD_FIELD_ERROR') throw err; });
+    }
     if (actual.role !== role) {
       auditoria.registrar(req, {
         accion: 'rol_miembro_cambiado', entidad: 'proyecto', entidadId: Number(id),
@@ -461,6 +482,51 @@ exports.updateMemberRole = async (req, res) => {
   } catch (error) {
     logger.error(error);
     res.status(500).json({ message: 'Error al actualizar rol' });
+  }
+};
+
+// PATCH /api/projects/:id/members/:userId/costos-fijos  { habilitado }
+// El administrador o el coordinador del sistema permiten (o retiran) que un
+// coordinador del proyecto vea y maneje los costos fijos de ese proyecto
+exports.delegarCostosFijos = async (req, res) => {
+  try {
+    if (!req.acceso?.delegarFijos) {
+      return res.status(403).json({
+        message: 'Solo el administrador o un coordinador del sistema puede delegar los costos fijos',
+      });
+    }
+    const { id, userId } = req.params;
+    const habilitado = req.body.habilitado === true;
+
+    const [[m]] = await db.query(
+      `SELECT pm.role, pm.ver_costos_fijos, u.name, u.role AS rol_sistema
+         FROM project_members pm JOIN users u ON u.id = pm.user_id
+        WHERE pm.project_id = ? AND pm.user_id = ?`, [id, userId]
+    );
+    if (!m) return res.status(404).json({ message: 'El usuario no es miembro del proyecto' });
+    if (habilitado && m.role !== 'coordinator') {
+      return res.status(400).json({ message: 'Solo se delegan los costos fijos a un coordinador del proyecto' });
+    }
+
+    if (Boolean(m.ver_costos_fijos) !== habilitado) {
+      await db.query(
+        'UPDATE project_members SET ver_costos_fijos = ? WHERE project_id = ? AND user_id = ?',
+        [habilitado ? 1 : 0, id, userId]
+      );
+      auditoria.registrar(req, {
+        accion: habilitado ? 'costos_fijos_delegados' : 'costos_fijos_retirados',
+        entidad: 'proyecto', entidadId: Number(id), detalle: m.name,
+      });
+    }
+    res.json({ user_id: Number(userId), ver_costos_fijos: habilitado });
+  } catch (error) {
+    if (error.code === 'ER_BAD_FIELD_ERROR') {
+      return res.status(503).json({
+        message: 'Falta actualizar la base de datos: carga database/actualizaciones/2026-11-09_costos_fijos_delegados.sql',
+      });
+    }
+    logger.error(error);
+    res.status(500).json({ message: 'Error al cambiar el acceso a los costos fijos' });
   }
 };
 

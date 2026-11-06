@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { projectsAPI, usersAPI, unitsAPI, poaAPI } from '../services/api';
-import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, UserCog, Lock, Unlock } from 'lucide-react';
+import { Kanban, CalendarDays, GanttChartSquare, List, Archive, ArchiveRestore, ArrowLeft, Edit, Users, Plus, Trash2, Building2, UserCog, Lock, Unlock, Wallet } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import ProjectForm from '../components/projects/ProjectForm';
 import BudgetPanel from '../components/projects/BudgetPanel';
@@ -10,6 +10,11 @@ import PhasesPanel from '../components/projects/PhasesPanel';
 import AlineacionPanel from '../components/projects/AlineacionPanel';
 import { useAuth } from '../context/AuthContext';
 import { useArchivoProyecto } from '../components/projects/AccionesArchivo';
+import { separarObjetivos } from '../utils/objetivos';
+
+const ROL_PROYECTO = { coordinator: 'Coordinador', member: 'Miembro', viewer: 'Visor' };
+// Roles del sistema que ya ven los costos fijos (no necesitan que se los deleguen)
+const ROLES_VEN_FIJOS = ['admin', 'coordinator', 'superViewer'];
 
 const statusConfig = {
   active:    { label: 'Activo',     color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -82,11 +87,31 @@ export default function ProjectDetail() {
       await projectsAPI.updateMemberRole(id, userId, newRole);
       setProject(prev => ({
         ...prev,
-        members: prev.members.map(m => m.id === userId ? { ...m, project_role: newRole } : m),
+        // Si deja de ser coordinador, pierde los costos fijos delegados
+        members: prev.members.map(m => m.id === userId
+          ? { ...m, project_role: newRole, ver_costos_fijos: newRole === 'coordinator' ? m.ver_costos_fijos : false }
+          : m),
       }));
       setEditingRoleId(null);
       toast.success('Rol actualizado');
     } catch { toast.error('Error al actualizar rol'); }
+  };
+
+  // El administrador o el coordinador del sistema permiten que un
+  // coordinador del proyecto vea y maneje los costos fijos
+  const handleCostosFijos = async (m) => {
+    const habilitar = !m.ver_costos_fijos;
+    if (habilitar && !confirm(`¿Permitir que ${m.name} vea y maneje los costos fijos (salarios y prestaciones) de este proyecto?`)) return;
+    try {
+      await projectsAPI.delegarCostosFijos(id, m.id, habilitar);
+      setProject(prev => ({
+        ...prev,
+        members: prev.members.map(x => x.id === m.id ? { ...x, ver_costos_fijos: habilitar } : x),
+      }));
+      toast.success(habilitar ? `${m.name} ya puede ver los costos fijos` : `${m.name} ya no ve los costos fijos`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo cambiar el acceso a los costos fijos');
+    }
   };
 
   if (loading) return (
@@ -146,8 +171,20 @@ export default function ProjectDetail() {
               <div className="w-4 h-4 rounded-full" style={{ backgroundColor: project.color }} />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{project.name}</h1>
               <span className={`badge ${st.color}`}>{st.label}</span>
+              {/* El bloqueo se indica con un candado en la etiqueta, sin aviso
+                  grande: el detalle aparece al pasar el mouse */}
               {Boolean(project.es_poa) && (
-                <span className="badge bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">POA</span>
+                <span
+                  className="badge bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 inline-flex items-center gap-1"
+                  title={bloqueado
+                    ? ['Planificación bloqueada',
+                        project.bloqueo?.bloqueada_at && `el ${new Date(project.bloqueo.bloqueada_at).toLocaleDateString('es-SV', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+                        project.bloqueo?.bloqueada_por_nombre && `por ${project.bloqueo.bloqueada_por_nombre}`,
+                      ].filter(Boolean).join(' ')
+                    : 'Viene del POA'}
+                >
+                  {bloqueado && <Lock className="w-3 h-3" />}POA
+                </span>
               )}
             </div>
             {project.description && (
@@ -161,12 +198,17 @@ export default function ProjectDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {puedeBloquear && !bloqueado && (
+          {puedeBloquear && (bloqueado ? (
+            <button onClick={() => cambiarBloqueo(false)} className="btn-secondary"
+              title="Permite de nuevo cambiar la planificación de este proyecto POA">
+              <Unlock className="w-4 h-4" /> Desbloquear planificación
+            </button>
+          ) : (
             <button onClick={() => cambiarBloqueo(true)} className="btn-secondary"
               title="Congela la planificación de este proyecto POA">
               <Lock className="w-4 h-4" /> Bloquear planificación
             </button>
-          )}
+          ))}
           {canEdit && (
             <button onClick={() => setShowEditModal(true)} className="btn-secondary">
               <Edit className="w-4 h-4" /> {canPlan ? 'Editar' : 'Cambiar estado'}
@@ -174,29 +216,6 @@ export default function ProjectDetail() {
           )}
         </div>
       </div>
-
-      {bloqueado && !project.archived_at && (
-        <div className="flex flex-wrap items-start gap-3 p-3 rounded-lg border border-indigo-200 dark:border-indigo-700/40 bg-indigo-50 dark:bg-indigo-900/20">
-          <Lock className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0 text-sm text-indigo-800 dark:text-indigo-200 space-y-0.5">
-            <p className="font-medium">
-              Planificación POA bloqueada
-              {project.bloqueo?.bloqueada_at && ` el ${new Date(project.bloqueo.bloqueada_at).toLocaleDateString('es-SV', { day: 'numeric', month: 'long', year: 'numeric' })}`}
-              {project.bloqueo?.bloqueada_por_nombre && ` por ${project.bloqueo.bloqueada_por_nombre}`}
-            </p>
-            <p className="text-indigo-700/90 dark:text-indigo-300/90">
-              {esAdmin
-                ? 'Para los demás ya no se pueden cambiar los datos, la alineación, el cronograma ni las partidas. Como administrador puedes seguir editando.'
-                : 'Ya no se pueden cambiar los datos, la alineación estratégica, el cronograma ni las partidas del presupuesto. Las tareas, sus costos y las evidencias siguen abiertas.'}
-            </p>
-          </div>
-          {puedeBloquear && (
-            <button onClick={() => cambiarBloqueo(false)} className="btn-secondary text-sm py-1.5">
-              <Unlock className="w-4 h-4" /> Desbloquear
-            </button>
-          )}
-        </div>
-      )}
 
       {project.archived_at && (
         <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20">
@@ -233,6 +252,25 @@ export default function ProjectDetail() {
           </div>
         ))}
       </div>
+
+      {/* Objetivos del proyecto, numerados */}
+      {separarObjetivos(project.objectives).length > 0 && (
+        <div className="card p-5">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
+            Objetivo{separarObjetivos(project.objectives).length === 1 ? '' : 's'} del proyecto
+          </h2>
+          <ol className="space-y-2">
+            {separarObjetivos(project.objectives).map((o, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
+                <span className="w-6 h-6 flex-shrink-0 rounded-full bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-xs font-semibold flex items-center justify-center">
+                  {i + 1}
+                </span>
+                <span className="pt-0.5 leading-relaxed">{o}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {/* Views */}
       <div>
@@ -306,12 +344,32 @@ export default function ProjectDetail() {
                       </select>
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 capitalize">{m.project_role}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5 flex-wrap">
+                      {ROL_PROYECTO[m.project_role] || m.project_role}
+                      {m.project_role === 'coordinator' && m.ver_costos_fijos && !ROLES_VEN_FIJOS.includes(m.system_role) && (
+                        <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400"
+                          title="Puede ver y manejar los costos fijos de este proyecto">
+                          <Wallet className="w-3 h-3" /> Costos fijos
+                        </span>
+                      )}
+                    </p>
                   )}
                 </div>
               </div>
               {canEdit && m.id !== user?.id && (
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {project.mi_acceso?.delegarFijos && m.project_role === 'coordinator' && !ROLES_VEN_FIJOS.includes(m.system_role) && (
+                    <button
+                      onClick={() => handleCostosFijos(m)}
+                      title={m.ver_costos_fijos ? 'Quitar acceso a los costos fijos' : 'Permitir ver los costos fijos'}
+                      aria-pressed={Boolean(m.ver_costos_fijos)}
+                      className={`p-1 rounded transition-colors ${m.ver_costos_fijos
+                        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30'
+                        : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400'}`}
+                    >
+                      <Wallet className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setEditingRoleId(editingRoleId === m.id ? null : m.id)}
                     title="Cambiar rol"
@@ -357,7 +415,7 @@ export default function ProjectDetail() {
       {archivo.modal}
 
       {showEditModal && (
-        <Modal title="Editar Proyecto" onClose={() => setShowEditModal(false)}>
+        <Modal title={canPlan ? 'Editar Proyecto' : 'Cambiar estado'} onClose={() => setShowEditModal(false)} size={canPlan ? 'lg' : 'md'}>
           <ProjectForm project={project} users={allUsers} soloEstado={!canPlan}
             onSave={handleUpdate} onCancel={() => setShowEditModal(false)} />
         </Modal>

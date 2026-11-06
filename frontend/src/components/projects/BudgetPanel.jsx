@@ -84,6 +84,8 @@ function normalizar(data) {
     sin_partida: sinPartida,
     summary: { ...calculado, ...(data?.summary?.ejecutado !== undefined ? data.summary : {}) },
     servidorAntiguo: !('sin_partida' in (data || {})),
+    // Quien consulta no puede ver los costos fijos (reservados por rol)
+    fijosOcultos: Boolean(data?.fijos_ocultos),
   };
 }
 
@@ -126,7 +128,8 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
   });
 
   const openNew = () => {
-    setForm(emptyForm);
+    // Sin acceso a los costos fijos, solo se crean partidas variables
+    setForm(data?.fijosOcultos ? { ...emptyForm, tipo: 'variable' } : emptyForm);
     setEditingId(null);
     setShowForm(true);
   };
@@ -237,8 +240,16 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
             Presupuesto del proyecto
           </h2>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Se arma con las partidas. Las variables suman el costo de sus tareas; las fijas se registran a mano.
+            {data?.fijosOcultos
+              ? 'Se arma con las partidas. Las variables suman el costo de sus tareas.'
+              : 'Se arma con las partidas. Las variables suman el costo de sus tareas; las fijas se registran a mano.'}
           </p>
+          {data?.fijosOcultos && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              Los costos fijos (salarios y prestaciones) solo los ven la coordinación del sistema, la administración
+              y la supervisión; no se incluyen en estos totales.
+            </p>
+          )}
         </div>
         {canEdit && !showForm && (
           <button onClick={openNew} className="btn-secondary text-xs py-1.5 px-3">
@@ -260,12 +271,13 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
       )}
 
       {/* Resumen */}
-      {summary && hayDatos && <Resumen summary={summary} />}
+      {summary && hayDatos && <Resumen summary={summary} fijosOcultos={data?.fijosOcultos} />}
 
       {soloEjecucion && (
         <p className="text-xs text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg px-3 py-2">
-          Planificación bloqueada: las partidas ya no se modifican. Puedes registrar el ejecutado de las partidas fijas;
-          el de las variables sale del costo de las tareas.
+          {data?.fijosOcultos
+            ? 'Planificación bloqueada: las partidas ya no se modifican. Su ejecutado sale del costo de las tareas.'
+            : 'Planificación bloqueada: las partidas ya no se modifican. Puedes registrar el ejecutado de las partidas fijas; el de las variables sale del costo de las tareas.'}
         </p>
       )}
 
@@ -309,7 +321,8 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
                 value={form.tipo}
                 onChange={e => setForm({ ...form, tipo: e.target.value })}
               >
-                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {TIPOS.filter(t => !data?.fijosOcultos || t.value === 'variable')
+                  .map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div className="sm:col-span-2">
@@ -419,7 +432,7 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
   );
 }
 
-function Resumen({ summary }) {
+function Resumen({ summary, fijosOcultos }) {
   const pct = summary.porcentaje;
   const c = COLOR[tono(pct)];
   const excedido = summary.disponible < 0;
@@ -439,7 +452,9 @@ function Resumen({ summary }) {
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
-          <Barra etiqueta="Fijos"     ejecutado={summary.ejecutado_fijo}     estimado={summary.estimado_fijo} />
+          {!fijosOcultos && (
+            <Barra etiqueta="Fijos"     ejecutado={summary.ejecutado_fijo}     estimado={summary.estimado_fijo} />
+          )}
           <Barra etiqueta="Variables" ejecutado={summary.ejecutado_variable} estimado={summary.estimado_variable} />
         </div>
       </div>
