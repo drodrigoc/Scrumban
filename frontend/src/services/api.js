@@ -48,6 +48,21 @@ export const auditoriaAPI = {
   descargarCsv: (params) => api.get('/auditoria/export.csv', { params, responseType: 'blob' }),
 };
 
+// Plan Estratégico Institucional: catálogo, tablero y alineación de proyectos
+const RUTA_NIVEL = { linea: 'lineas', accion: 'acciones', actividad: 'actividades' };
+export const peiAPI = {
+  arbol:        ()                  => api.get('/pei'),
+  tablero:      (params)            => api.get('/pei/tablero', { params }),
+  guardarPlan:  (data)              => api.put('/pei/plan', data),
+  crear:        (nivel, data)       => api.post(`/pei/${RUTA_NIVEL[nivel]}`, data),
+  actualizar:   (nivel, id, data)   => api.put(`/pei/${RUTA_NIVEL[nivel]}/${id}`, data),
+  eliminar:     (nivel, id)         => api.delete(`/pei/${RUTA_NIVEL[nivel]}/${id}`),
+  deProyecto:   (projectId)         => api.get(`/projects/${projectId}/pei`),
+  vincular:     (projectId, actividadId) => api.post(`/projects/${projectId}/pei`, { actividad_id: actividadId }),
+  actualizarVinculo: (projectId, id, data) => api.put(`/projects/${projectId}/pei/${id}`, data),
+  desvincular:  (projectId, id)     => api.delete(`/projects/${projectId}/pei/${id}`),
+};
+
 // Configuración del sistema (solo administradores)
 export const settingsAPI = {
   getEmail:        ()     => api.get('/settings/email'),

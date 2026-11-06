@@ -2,6 +2,7 @@ const router = require('express').Router();
 const ctrl   = require('../controllers/projectController');
 const budget = require('../controllers/budgetController');
 const phases = require('../controllers/phaseController');
+const pei    = require('../controllers/peiController');
 const { authenticate, requireProjectAccess } = require('../middleware/auth');
 
 router.use(authenticate);
@@ -45,5 +46,11 @@ router.get('/:id/phases',             lectura, phases.getAll);
 router.post('/:id/phases',            gestion, phases.create);
 router.put('/:id/phases/:phaseId',    gestion, phases.update);
 router.delete('/:id/phases/:phaseId', gestion, phases.remove);
+
+// Alineación con el Plan Estratégico Institucional
+router.get('/:id/pei',               lectura, pei.getProyecto);
+router.post('/:id/pei',              gestion, pei.vincular);
+router.put('/:id/pei/:vinculoId',    gestion, pei.actualizarVinculo);
+router.delete('/:id/pei/:vinculoId', gestion, pei.desvincular);
 
 module.exports = router;

@@ -41,6 +41,52 @@ const COLOR = {
   gris:  { trazo: 'stroke-gray-300',  barra: 'bg-gray-300',  texto: 'text-gray-500 dark:text-gray-400'   },
 };
 
+/*
+ * Si el backend todavía es la versión anterior (sin el cálculo por tareas),
+ * su respuesta no trae ejecutado, disponible ni tareas por partida. Antes
+ * eso rompía toda la página; ahora se adapta y se avisa.
+ */
+function normalizar(data) {
+  const items = (data?.items || []).map(it => {
+    const estimado  = Number(it.monto_estimado) || 0;
+    const ejecutado = it.ejecutado ?? (Number(it.monto_ejecutado) || 0);
+    return {
+      ...it,
+      monto_estimado: estimado,
+      ejecutado,
+      disponible: it.disponible ?? estimado - ejecutado,
+      origen:     it.origen || 'manual',
+      tareas:     Array.isArray(it.tareas) ? it.tareas : [],
+    };
+  });
+  const sinPartida = {
+    total:  Number(data?.sin_partida?.total) || 0,
+    tareas: Array.isArray(data?.sin_partida?.tareas) ? data.sin_partida.tareas : [],
+  };
+
+  const suma = (lista) => lista.reduce((s, x) => s + x, 0);
+  const de = (tipo, campo) => suma(items.filter(i => i.tipo === tipo).map(i => i[campo]));
+  const presupuesto = suma(items.map(i => i.monto_estimado));
+  const ejecutado   = suma(items.map(i => i.ejecutado)) + sinPartida.total;
+  const calculado = {
+    presupuesto,
+    ejecutado,
+    disponible: presupuesto - ejecutado,
+    porcentaje: presupuesto > 0 ? Math.round((ejecutado / presupuesto) * 100) : null,
+    estimado_fijo:      de('fijo', 'monto_estimado'),
+    ejecutado_fijo:     de('fijo', 'ejecutado'),
+    estimado_variable:  de('variable', 'monto_estimado'),
+    ejecutado_variable: de('variable', 'ejecutado') + sinPartida.total,
+  };
+
+  return {
+    items,
+    sin_partida: sinPartida,
+    summary: { ...calculado, ...(data?.summary?.ejecutado !== undefined ? data.summary : {}) },
+    servidorAntiguo: !('sin_partida' in (data || {})),
+  };
+}
+
 const emptyForm = {
   tipo: 'fijo', categoria: '', descripcion: '',
   monto_estimado: '', monto_ejecutado: '', fecha: '',
@@ -59,7 +105,7 @@ export default function BudgetPanel({ projectId, canEdit }) {
   const load = async () => {
     try {
       const { data } = await budgetAPI.getAll(projectId);
-      setData(data);
+      setData(normalizar(data));
       setError(null);
     } catch (err) {
       setError(err.response?.data?.message || 'Error al cargar el presupuesto');
@@ -180,6 +226,14 @@ export default function BudgetPanel({ projectId, canEdit }) {
           </button>
         )}
       </div>
+
+      {data?.servidorAntiguo && (
+        <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          El servidor todavía tiene la versión anterior del presupuesto: el ejecutado de las partidas
+          variables aún no se calcula con las tareas. Hay que actualizar y reiniciar el backend.
+        </p>
+      )}
 
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-3">{error}</p>

@@ -51,6 +51,7 @@ app.use('/api/sgc',       require('./routes/sgc'));
 app.use('/api/my-tasks',  require('./routes/myTasks'));
 app.use('/api/settings',  require('./routes/settings'));
 app.use('/api/auditoria', require('./routes/auditoria'));
+app.use('/api/pei',       require('./routes/pei'));
 
 // Health check
 app.get('/api/health', (req, res) => {
