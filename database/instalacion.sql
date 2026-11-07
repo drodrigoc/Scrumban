@@ -29,6 +29,7 @@ CREATE TABLE users (
   unit                VARCHAR(100) DEFAULT NULL,
   role                ENUM('admin','coordinator','member','superViewer') DEFAULT 'member',
   sgc_access          BOOLEAN DEFAULT FALSE,
+  pei_access          BOOLEAN DEFAULT FALSE,           -- puede ver el Plan estratégico
   is_active           BOOLEAN DEFAULT TRUE,
   email_notifications BOOLEAN NOT NULL DEFAULT TRUE,
   reset_token         VARCHAR(255) DEFAULT NULL,

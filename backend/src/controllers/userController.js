@@ -3,15 +3,16 @@ const bcrypt = require('bcryptjs');
 const db = require('../config/database');
 const { hoyLocal } = require('../services/sgcCobertura');
 const auditoria = require('../services/auditoria');
+const { consultar } = require('../services/columnasOpcionales');
 
 // Cómo se muestran los campos de un usuario en la auditoría
 const CAMPOS_AUDITADOS = {
   name: 'nombre', email: 'correo', role: 'rol', unit: 'unidad',
-  is_active: 'activo', sgc_access: 'acceso SGC', avatar: 'foto',
+  is_active: 'activo', sgc_access: 'acceso SGC', pei_access: 'acceso Plan estratégico', avatar: 'foto',
 };
 const valorLegible = (campo, v) => {
   if (campo === 'avatar') return v ? 'con foto' : 'sin foto';
-  if (campo === 'is_active' || campo === 'sgc_access') return v ? 'sí' : 'no';
+  if (campo === 'is_active' || campo === 'sgc_access' || campo === 'pei_access') return v ? 'sí' : 'no';
   return v == null || v === '' ? '—' : String(v);
 };
 // "rol: member → coordinator; unidad: — → Calidad"
@@ -38,7 +39,8 @@ exports.getAll = async (req, res) => {
   try {
     // El último acceso solo lo ve un administrador
     const ultimoAcceso = req.user.role === 'admin' ? ', last_login_at' : '';
-    const [users] = await db.query(
+    const [users] = await consultar(db, 'pei_access',
+      `SELECT id, name, email, role, sgc_access, pei_access, unit, is_active, avatar, created_at${ultimoAcceso} FROM users ORDER BY name`,
       `SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at${ultimoAcceso} FROM users ORDER BY name`
     );
     res.json(users);
@@ -50,7 +52,8 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
   try {
-    const [users] = await db.query(
+    const [users] = await consultar(db, 'pei_access',
+      'SELECT id, name, email, role, sgc_access, pei_access, unit, is_active, avatar, created_at FROM users WHERE id = ?',
       'SELECT id, name, email, role, sgc_access, unit, is_active, avatar, created_at FROM users WHERE id = ?',
       [idDeUrl(req)]
     );
@@ -64,7 +67,7 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, email, password, role, unit } = req.body;
+    const { name, email, password, role, unit, sgc_access, pei_access } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Nombre, email y contraseña son requeridos' });
@@ -86,15 +89,22 @@ exports.create = async (req, res) => {
     }
 
     const hashed = await bcrypt.hash(password, 10);
-    const [result] = await db.query(
-      'INSERT INTO users (name, email, password, role, unit) VALUES (?, ?, ?, ?, ?)',
-      [name.trim(), email.toLowerCase().trim(), hashed, role || 'member', unit || null]
+    // Los accesos al SGC y al Plan estratégico se guardan desde la creación
+    // (antes el del SGC solo se guardaba al editar al usuario)
+    const base = [name.trim(), email.toLowerCase().trim(), hashed, role || 'member', unit || null, sgc_access ? 1 : 0];
+    const [result] = await consultar(db, 'pei_access',
+      'INSERT INTO users (name, email, password, role, unit, sgc_access, pei_access) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (name, email, password, role, unit, sgc_access) VALUES (?, ?, ?, ?, ?, ?)',
+      [...base, pei_access ? 1 : 0]
     );
 
     auditoria.registrar(req, {
       accion: 'usuario_creado', entidad: 'usuario', entidadId: result.insertId,
       entidadNombre: `${name.trim()} <${email.toLowerCase().trim()}>`,
-      detalle: `rol: ${role || 'member'}${unit ? `; unidad: ${unit}` : ''}`,
+      detalle: [
+        `rol: ${role || 'member'}`, unit && `unidad: ${unit}`,
+        sgc_access && 'acceso SGC', pei_access && 'acceso Plan estratégico',
+      ].filter(Boolean).join('; '),
     });
 
     res.status(201).json({
@@ -103,6 +113,8 @@ exports.create = async (req, res) => {
       email: email.toLowerCase().trim(),
       role: role || 'member',
       unit: unit || null,
+      sgc_access: Boolean(sgc_access),
+      pei_access: Boolean(pei_access),
       is_active: true,
     });
   } catch (error) {
@@ -116,7 +128,7 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { name, email, role, unit, is_active, avatar, sgc_access } = req.body;
+    const { name, email, role, unit, is_active, avatar, sgc_access, pei_access } = req.body;
     const id = idDeUrl(req);
     if (!id) return res.status(400).json({ message: 'Usuario no válido' });
 
@@ -157,18 +169,20 @@ exports.update = async (req, res) => {
       }
       if (is_active !== undefined)  { fields.push('is_active = ?');  values.push(is_active); }
       if (sgc_access !== undefined) { fields.push('sgc_access = ?'); values.push(sgc_access ? 1 : 0); }
+      if (pei_access !== undefined) { fields.push('pei_access = ?'); values.push(pei_access ? 1 : 0); }
     }
 
     if (!fields.length) return res.status(400).json({ message: 'No hay campos para actualizar' });
 
-    const SELECCION = 'SELECT id, name, email, role, sgc_access, unit, is_active, avatar FROM users WHERE id = ?';
-    const [[antes]] = await db.query(SELECCION, [id]);
+    const SELECCION = 'SELECT id, name, email, role, sgc_access, pei_access, unit, is_active, avatar FROM users WHERE id = ?';
+    const SELECCION_SIN_PEI = 'SELECT id, name, email, role, sgc_access, unit, is_active, avatar FROM users WHERE id = ?';
+    const [[antes]] = await consultar(db, 'pei_access', SELECCION, SELECCION_SIN_PEI, [id]);
     if (!antes) return res.status(404).json({ message: 'Usuario no encontrado' });
 
     values.push(id);
     await db.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 
-    const [updated] = await db.query(SELECCION, [id]);
+    const [updated] = await consultar(db, 'pei_access', SELECCION, SELECCION_SIN_PEI, [id]);
     const cambios = describirCambios(antes, updated[0]);
     if (cambios) {
       auditoria.registrar(req, {

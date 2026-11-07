@@ -6,6 +6,7 @@ const db = require('../config/database');
 const email = require('../services/email');
 const { render, urlApp } = require('../services/plantillasCorreo');
 const auditoria = require('../services/auditoria');
+const { consultar } = require('../services/columnasOpcionales');
 
 // En la base solo se guarda el hash del token de recuperación: si alguien
 // leyera la tabla, no podría usar los enlaces vigentes
@@ -29,7 +30,8 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Email y contraseña son requeridos' });
     }
 
-    const [users] = await db.query(
+    const [users] = await consultar(db, 'pei_access',
+      'SELECT id, name, email, password, role, sgc_access, pei_access, is_active, avatar FROM users WHERE email = ?',
       'SELECT id, name, email, password, role, sgc_access, is_active, avatar FROM users WHERE email = ?',
       [email.toLowerCase().trim()]
     );
@@ -76,7 +78,8 @@ exports.login = async (req, res) => {
 
 exports.getMe = async (req, res) => {
   try {
-    const [users] = await db.query(
+    const [users] = await consultar(db, 'pei_access',
+      'SELECT id, name, email, role, sgc_access, pei_access, is_active, avatar, created_at FROM users WHERE id = ?',
       'SELECT id, name, email, role, sgc_access, is_active, avatar, created_at FROM users WHERE id = ?',
       [req.user.id]
     );

@@ -175,7 +175,16 @@ export default function Users() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`badge ${roleInfo.color}`}>{roleInfo.label}</span>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className={`badge ${roleInfo.color}`}>{roleInfo.label}</span>
+                        {/* Accesos especiales (el administrador y el Super Visor ya los tienen) */}
+                        {!['admin', 'superViewer'].includes(u.role) && u.sgc_access && (
+                          <span className="badge bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300" title="Acceso al SGC">SGC</span>
+                        )}
+                        {!['admin', 'superViewer'].includes(u.role) && u.pei_access && (
+                          <span className="badge bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300" title="Acceso al Plan estratégico">Plan</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`badge ${u.is_active
@@ -265,6 +274,7 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
     role:       user?.role       || 'member',
     unit:       user?.unit       || '',
     sgc_access: user?.sgc_access || false,
+    pei_access: user?.pei_access || false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -346,6 +356,21 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
           />
           <label htmlFor="sgc_access" className="text-sm font-medium text-amber-800 dark:text-amber-300 cursor-pointer select-none">
             Acceso al SGC (Sistema de Gestión de Calidad)
+          </label>
+        </div>
+      )}
+      {/* Acceso al Plan estratégico — igual que el SGC */}
+      {form.role !== 'admin' && form.role !== 'superViewer' && (
+        <div className="flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
+          <input
+            type="checkbox"
+            id="pei_access"
+            checked={!!form.pei_access}
+            onChange={e => setForm({ ...form, pei_access: e.target.checked })}
+            className="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+          />
+          <label htmlFor="pei_access" className="text-sm font-medium text-indigo-800 dark:text-indigo-300 cursor-pointer select-none">
+            Acceso al Plan estratégico (tablero y catálogo)
           </label>
         </div>
       )}

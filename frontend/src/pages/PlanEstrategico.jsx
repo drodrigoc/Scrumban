@@ -24,7 +24,9 @@ const normalizar = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '
 
 export default function PlanEstrategico() {
   const { user } = useAuth();
-  const verTablero = ['admin', 'superViewer'].includes(user?.role);
+  // Quien entra a esta página ve el tablero: administrador, Super Visor o
+  // quien tenga acceso al Plan estratégico. El catálogo solo lo edita el administrador.
+  const verTablero = ['admin', 'superViewer'].includes(user?.role) || !!user?.pei_access;
   const esAdmin = user?.role === 'admin';
   const [pestana, setPestana] = useState(verTablero ? 'tablero' : 'catalogo');
   const [arbol, setArbol] = useState(null);

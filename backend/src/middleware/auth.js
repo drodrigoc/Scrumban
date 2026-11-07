@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
+const { consultar } = require('../services/columnasOpcionales');
 
 const authenticate = async (req, res, next) => {
   try {
@@ -11,7 +12,9 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const [users] = await db.query(
+    // pei_access es nueva: si la base aún no la tiene, se lee sin ella
+    const [users] = await consultar(db, 'pei_access',
+      'SELECT id, name, email, role, sgc_access, pei_access, is_active, avatar, unit FROM users WHERE id = ?',
       'SELECT id, name, email, role, sgc_access, is_active, avatar, unit FROM users WHERE id = ?',
       [decoded.userId]
     );
@@ -260,8 +263,16 @@ const authorizeSGC = (req, res, next) => {
   return res.status(403).json({ message: 'No tienes permisos para acceder al SGC' });
 };
 
+// Plan estratégico (tablero y página): igual que el SGC, el administrador, el
+// Super Visor y quien tenga pei_access
+const authorizePEI = (req, res, next) => {
+  const { role, pei_access } = req.user;
+  if (role === 'admin' || role === 'superViewer' || pei_access) return next();
+  return res.status(403).json({ message: 'No tienes permisos para acceder al Plan estratégico' });
+};
+
 module.exports = {
-  authenticate, authorize, authorizeSGC,
+  authenticate, authorize, authorizeSGC, authorizePEI,
   accesoAProyecto, permisosDeArchivo, requireProjectAccess, requireTaskInProject,
   planificacionBloqueada, MENSAJE_BLOQUEO,
 };
