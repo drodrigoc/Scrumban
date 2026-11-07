@@ -49,8 +49,8 @@ export default function PlanEstrategico() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <Target className="w-6 h-6 text-primary-500" />
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Target className="w-6 h-6 text-primary-500 flex-shrink-0" />
           {plan?.nombre || 'Plan Estratégico Institucional'}
           {plan?.anio_inicio && (
             <span className="text-lg font-medium text-gray-400 dark:text-gray-500">{plan.anio_inicio}–{plan.anio_fin}</span>
@@ -62,12 +62,12 @@ export default function PlanEstrategico() {
       </div>
 
       {verTablero && (
-        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 overflow-x-auto whitespace-nowrap scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[['tablero', 'Tablero'], ['catalogo', 'Catálogo']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setPestana(id)}
-              className={`pb-2 px-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`pb-3 sm:pb-2 px-4 sm:px-3 text-sm font-medium border-b-2 transition-colors flex-shrink-0 ${
                 pestana === id
                   ? 'border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -117,8 +117,8 @@ function Tablero({ plan }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
-        <label className="text-sm text-gray-500 dark:text-gray-400">Proyectos de</label>
-        <select className="input w-auto py-1.5" value={anio} onChange={e => setAnio(e.target.value)}>
+        <label className="text-sm text-gray-500 dark:text-gray-400 w-full sm:w-auto">Proyectos de</label>
+        <select className="input w-full sm:w-auto py-1.5" value={anio} onChange={e => setAnio(e.target.value)}>
           <option value="">todos los años</option>
           {anios.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
@@ -169,7 +169,7 @@ function Tablero({ plan }) {
               <div className="flex flex-wrap gap-2">
                 {datos.sin_alinear.map(p => (
                   <Link key={p.id} to={`/projects/${p.id}`}
-                    className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                    className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1.5 sm:py-1 rounded-full max-w-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
                     {p.name}{p.archivado ? ' (archivado)' : ''}
                   </Link>
@@ -185,9 +185,9 @@ function Tablero({ plan }) {
 
 function Cifra({ etiqueta, valor, nota }) {
   return (
-    <div className="card p-4">
+    <div className="card p-3 sm:p-4 min-w-0">
       <p className="text-xs text-gray-500 dark:text-gray-400">{etiqueta}</p>
-      <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums mt-1">{valor}</p>
+      <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums mt-1 break-words">{valor}</p>
       {nota && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{nota}</p>}
     </div>
   );
@@ -217,7 +217,7 @@ function LineaTablero({ l, abierta, onAlternar, soloCubiertas }) {
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
-                <p className="font-medium text-gray-900 dark:text-gray-100">Línea {l.numero} · {l.nombre}</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100 break-words">Línea {l.numero} · {l.nombre}</p>
                 {l.responsable && <p className="text-xs text-gray-400 dark:text-gray-500">{l.responsable}</p>}
               </div>
               <div className="text-right text-xs text-gray-500 dark:text-gray-400">
@@ -234,7 +234,7 @@ function LineaTablero({ l, abierta, onAlternar, soloCubiertas }) {
       </button>
 
       {abierta && (
-        <div className="px-4 pb-4 pl-11 space-y-3">
+        <div className="px-4 pb-4 pl-8 sm:pl-11 space-y-3">
           {l.acciones.map(a => {
             const actividades = soloCubiertas ? a.actividades.filter(x => x.proyectos.length) : a.actividades;
             if (!actividades.length) return null;
@@ -244,7 +244,7 @@ function LineaTablero({ l, abierta, onAlternar, soloCubiertas }) {
                 <ul className="space-y-1.5">
                   {actividades.map(act => (
                     <li key={act.id} className="text-sm">
-                      <p className="text-gray-700 dark:text-gray-300">
+                      <p className="text-gray-700 dark:text-gray-300 break-words">
                         <span className="font-semibold tabular-nums">{act.numero}.</span> {act.nombre}
                         {act.indicador && <span className="text-xs text-gray-400 dark:text-gray-500"> · {act.indicador}</span>}
                       </p>
@@ -255,7 +255,7 @@ function LineaTablero({ l, abierta, onAlternar, soloCubiertas }) {
                         {act.proyectos.map(p => (
                           <Link key={p.id} to={`/projects/${p.id}`}
                             title={p.cumplido ? 'Cumplida' : 'Pendiente'}
-                            className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${p.cumplido
+                            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 sm:px-2 sm:py-0.5 rounded-full border max-w-full break-words ${p.cumplido
                               ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
                               : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'}`}>
                             {p.cumplido ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
@@ -364,7 +364,7 @@ function Catalogo({ arbol, esAdmin, recargar }) {
   return (
     <div className="space-y-4">
       <div className="card p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
           <div>
             <p className="font-semibold text-gray-900 dark:text-gray-100">Misión y visión</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -372,7 +372,7 @@ function Catalogo({ arbol, esAdmin, recargar }) {
             </p>
           </div>
           {esAdmin && (
-            <button onClick={() => setEditPlan(true)} className="btn-secondary text-xs py-1.5 px-3">
+            <button onClick={() => setEditPlan(true)} className="btn-secondary text-xs py-2 sm:py-1.5 px-3 self-start">
               <Pencil className="w-3.5 h-3.5" /> Editar
             </button>
           )}
@@ -390,12 +390,12 @@ function Catalogo({ arbol, esAdmin, recargar }) {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-[220px]">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input className="input pl-9 pr-8" placeholder="Buscar actividad por número, nombre o indicador…"
             value={q} onChange={e => setQ(e.target.value)} />
           {q && (
-            <button onClick={() => setQ('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600">
+            <button onClick={() => setQ('')} aria-label="Limpiar búsqueda" className="absolute right-1 top-1/2 -translate-y-1/2 p-2 sm:p-1 text-gray-400 hover:text-gray-600">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
@@ -404,7 +404,7 @@ function Catalogo({ arbol, esAdmin, recargar }) {
           {arbol.lineas.length} líneas · {todasAcciones.length} acciones · {todasActividades.length} actividades
         </span>
         {esAdmin && (
-          <button onClick={() => abrirNuevo('linea')} className="btn-secondary text-sm">
+          <button onClick={() => abrirNuevo('linea')} className="btn-secondary text-sm w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" /> Nueva línea
           </button>
         )}
@@ -418,13 +418,13 @@ function Catalogo({ arbol, esAdmin, recargar }) {
         const abierta = busca || abiertas.has(l.id);
         return (
           <div key={l.id} className="card overflow-hidden">
-            <div className="flex items-start gap-3 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 p-4">
               <button type="button" onClick={() => alternar(l.id)} className="flex-1 min-w-0 text-left flex items-start gap-3">
                 <ChevronRight className={`w-4 h-4 mt-1 text-gray-400 flex-shrink-0 transition-transform ${abierta ? 'rotate-90' : ''}`} />
                 <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 dark:text-gray-100">Línea {l.numero} · {l.nombre}</p>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100 break-words">Línea {l.numero} · {l.nombre}</p>
                   {l.objetivo && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 break-words">
                       <span className="font-medium">Objetivo estratégico {l.numero}:</span> {l.objetivo}
                     </p>
                   )}
@@ -447,10 +447,10 @@ function Catalogo({ arbol, esAdmin, recargar }) {
                 )}
                 {l.acciones.map(a => (
                   <div key={a.id} className="px-4 py-3 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Acción {a.numero} · {a.nombre}</p>
-                        {a.recursos && <p className="text-xs text-gray-400 dark:text-gray-500">Recursos: {a.recursos}</p>}
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 break-words">Acción {a.numero} · {a.nombre}</p>
+                        {a.recursos && <p className="text-xs text-gray-400 dark:text-gray-500 break-words">Recursos: {a.recursos}</p>}
                       </div>
                       {esAdmin && (
                         <Acciones
@@ -461,7 +461,33 @@ function Catalogo({ arbol, esAdmin, recargar }) {
                       )}
                     </div>
                     {a.actividades.length > 0 && (
-                      <div className="overflow-x-auto -mx-1">
+                      <ul className="sm:hidden space-y-2">
+                        {a.actividades.map(x => (
+                          <li key={x.id} className="rounded-lg border border-gray-100 dark:border-gray-700 p-3 text-sm">
+                            <div className="flex items-start gap-2">
+                              <p className="flex-1 min-w-0 text-gray-700 dark:text-gray-300 break-words">
+                                <span className="font-semibold tabular-nums">{x.numero}.</span> {x.nombre}
+                              </p>
+                              {esAdmin && (
+                                <div className="flex items-center flex-shrink-0">
+                                  <button aria-label="Editar actividad" onClick={() => setForm({ nivel: 'actividad', id: x.id, valores: x })}
+                                    className="p-2.5 text-gray-400 hover:text-primary-500"><Pencil className="w-4 h-4" /></button>
+                                  <button aria-label="Eliminar actividad" onClick={() => eliminar('actividad', x)}
+                                    className="p-2.5 ml-1 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              )}
+                            </div>
+                            <dl className="mt-1.5 space-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                              {x.periodo_inicio && <div><dt className="inline font-medium">Periodo: </dt><dd className="inline">{x.periodo_inicio}–{x.periodo_fin}</dd></div>}
+                              {x.indicador && <div className="break-words"><dt className="inline font-medium">Indicador: </dt><dd className="inline">{x.indicador}</dd></div>}
+                              {x.fuente_verificacion && <div className="break-words"><dt className="inline font-medium">Fuente: </dt><dd className="inline">{x.fuente_verificacion}</dd></div>}
+                            </dl>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {a.actividades.length > 0 && (
+                      <div className="hidden sm:block overflow-x-auto -mx-1">
                         <table className="w-full text-sm min-w-[640px]">
                           <thead>
                             <tr className="text-left text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
@@ -521,12 +547,12 @@ function Catalogo({ arbol, esAdmin, recargar }) {
 
 function Acciones({ onAgregar, agregarTexto, onEditar, onEliminar }) {
   return (
-    <div className="flex items-center gap-1 flex-shrink-0">
-      <button onClick={onAgregar} className="text-xs text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-0.5 px-1">
+    <div className="flex items-center gap-1 flex-shrink-0 self-start sm:self-auto -ml-2 sm:ml-0">
+      <button onClick={onAgregar} className="text-xs text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-0.5 px-2 py-2.5 sm:p-0 sm:px-1">
         <Plus className="w-3 h-3" /> {agregarTexto}
       </button>
-      <button title="Editar" onClick={onEditar} className="p-1 text-gray-400 hover:text-primary-500"><Pencil className="w-3.5 h-3.5" /></button>
-      <button title="Eliminar" onClick={onEliminar} className="p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+      <button title="Editar" aria-label="Editar" onClick={onEditar} className="p-2.5 sm:p-1 text-gray-400 hover:text-primary-500"><Pencil className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
+      <button title="Eliminar" aria-label="Eliminar" onClick={onEliminar} className="p-2.5 ml-1 sm:ml-0 sm:p-1 text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
     </div>
   );
 }
@@ -594,7 +620,7 @@ function FormNivel({ form, arbol, onCerrar, onGuardado }) {
             </div>
           ))}
         </div>
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
           <button type="button" className="btn-secondary flex-1" onClick={onCerrar}>Cancelar</button>
           <button type="submit" disabled={guardando} className="btn-primary flex-1">
             {guardando ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" /> : 'Guardar'}
@@ -654,7 +680,7 @@ function FormPlan({ plan, onCerrar, onGuardado }) {
           <textarea className="input resize-none" rows={4} value={v.vision} onChange={e => setV({ ...v, vision: e.target.value })} />
         </div>
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <div className="flex gap-2 pt-2">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
           <button type="button" className="btn-secondary flex-1" onClick={onCerrar}>Cancelar</button>
           <button type="submit" disabled={guardando} className="btn-primary flex-1">
             {guardando ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" /> : 'Guardar'}

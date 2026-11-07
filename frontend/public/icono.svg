@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícono provisional de USO Projects: check blanco sobre el azul de la app.
+       Para cambiarlo, reemplazar este archivo y regenerar los PNG
+       (frontend/scripts/generar-iconos.py). -->
+  <rect width="512" height="512" rx="112" fill="#2563eb"/>
+  <path d="M146 266 l74 74 l148 -168" fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

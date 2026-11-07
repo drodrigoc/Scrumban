@@ -158,9 +158,9 @@ function NivelForm({ nivel, registro, padreInicial, listas, onSave, onCancel, sa
         {conf.padre && ' y empieza con el código de su nivel superior'}.
       </p>
 
-      <div className="flex gap-2 justify-end pt-1">
-        <button type="button" onClick={onCancel} className="btn-secondary text-sm">Cancelar</button>
-        <button type="submit" disabled={saving} className="btn-primary text-sm">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+        <button type="button" onClick={onCancel} className="btn-secondary text-sm w-full sm:w-auto justify-center">Cancelar</button>
+        <button type="submit" disabled={saving} className="btn-primary text-sm w-full sm:w-auto justify-center">
           {saving
             ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             : <><Check className="w-3.5 h-3.5" /> Guardar</>}
@@ -179,13 +179,13 @@ function Fila({ nivel, codigo, nombre, descripcion, meta, abierto, onToggle, acc
   const conHijos = nivel !== 'evidencia';
   return (
     <div
-      className={`group flex items-center gap-2 py-2 pr-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
+      className={`group flex items-center gap-2 py-2 pr-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/60 pl-[calc(var(--sg)_*_0.75rem_+_0.5rem)] sm:pl-[calc(var(--sg)_*_1.5rem_+_0.5rem)] ${
         nivel === 'dimension' ? 'bg-gray-50/70 dark:bg-gray-800/40' : ''
       }`}
-      style={{ paddingLeft: `${SANGRIA[nivel] * 1.5 + 0.5}rem` }}
+      style={{ '--sg': SANGRIA[nivel] }}
     >
       {conHijos ? (
-        <button onClick={onToggle} className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+        <button onClick={onToggle} className="p-2 -m-1.5 sm:p-0.5 sm:m-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
           aria-label={abierto ? 'Contraer' : 'Expandir'} aria-expanded={abierto}>
           {abierto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
@@ -199,7 +199,7 @@ function Fila({ nivel, codigo, nombre, descripcion, meta, abierto, onToggle, acc
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm truncate ${nivel === 'dimension' ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-800 dark:text-gray-200'}`}>
+          <span className={`text-sm break-words sm:truncate min-w-0 ${nivel === 'dimension' ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-800 dark:text-gray-200'}`}>
             {nombre}
           </span>
           {provisional && (
@@ -208,7 +208,7 @@ function Fila({ nivel, codigo, nombre, descripcion, meta, abierto, onToggle, acc
           {meta && <span className="text-xs text-gray-400 dark:text-gray-500">{meta}</span>}
         </div>
         {descripcion && nivel === 'evidencia' && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{descripcion}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 break-words sm:truncate">{descripcion}</p>
         )}
       </div>
 
@@ -224,7 +224,7 @@ function Fila({ nivel, codigo, nombre, descripcion, meta, abierto, onToggle, acc
 const BotonIcono = ({ titulo, onClick, peligro, children }) => (
   <button
     type="button" title={titulo} aria-label={titulo} onClick={onClick}
-    className={`p-1 rounded text-gray-400 ${peligro ? 'hover:text-red-500' : 'hover:text-primary-600 dark:hover:text-primary-400'}`}
+    className={`p-2.5 sm:p-1 rounded text-gray-400 ${peligro ? 'hover:text-red-500' : 'hover:text-primary-600 dark:hover:text-primary-400'}`}
   >
     {children}
   </button>
@@ -390,26 +390,26 @@ function GestionTab({ esAdmin }) {
     <div className="space-y-4">
       {/* Barra de herramientas */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-56">
+        <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-56">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             className="input text-sm py-1.5 pl-9" placeholder="Buscar por código o nombre en cualquier nivel…"
             value={busqueda} onChange={e => setBusqueda(e.target.value)}
           />
           {busqueda && (
-            <button onClick={() => setBusqueda('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" aria-label="Limpiar búsqueda">
+            <button onClick={() => setBusqueda('')} className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 p-2 sm:p-0 text-gray-400 hover:text-gray-600" aria-label="Limpiar búsqueda">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
-        <button onClick={expandirTodo} className="btn-secondary text-xs py-1.5 px-3" title="Expandir todo">
+        <button onClick={expandirTodo} className="btn-secondary text-xs py-2 sm:py-1.5 px-3 flex-1 sm:flex-none justify-center" title="Expandir todo">
           <ChevronsUpDown className="w-3.5 h-3.5" /> Expandir
         </button>
-        <button onClick={() => setAbiertos(new Set())} className="btn-secondary text-xs py-1.5 px-3" title="Contraer todo">
+        <button onClick={() => setAbiertos(new Set())} className="btn-secondary text-xs py-2 sm:py-1.5 px-3 flex-1 sm:flex-none justify-center" title="Contraer todo">
           <ChevronsDownUp className="w-3.5 h-3.5" /> Contraer
         </button>
         {esAdmin && (
-          <button onClick={() => setEditor({ nivel: 'dimension' })} className="btn-primary text-sm py-1.5">
+          <button onClick={() => setEditor({ nivel: 'dimension' })} className="btn-primary text-sm py-2 sm:py-1.5 w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" /> Nueva dimensión
           </button>
         )}
@@ -473,7 +473,7 @@ function GestionTab({ esAdmin }) {
                             ))}
 
                             {estaAbierto(ki) && i.evidencias.length === 0 && (
-                              <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1.5" style={{ paddingLeft: '5.5rem' }}>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1.5 pl-14 sm:pl-[5.5rem]">
                                 Sin evidencias.
                               </p>
                             )}
@@ -527,8 +527,8 @@ export default function SGCAdmin() {
 
   return (
     <div className="max-w-5xl mx-auto animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+      <div className="flex items-center gap-3 mb-6 min-w-0">
+        <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
           <ShieldCheck className="w-5 h-5 text-primary-600 dark:text-primary-400" />
         </div>
         <div>
@@ -539,12 +539,12 @@ export default function SGCAdmin() {
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1 overflow-x-auto">
+      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
               tab === t.id
                 ? 'border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'

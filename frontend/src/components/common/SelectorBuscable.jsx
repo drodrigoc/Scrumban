@@ -27,7 +27,7 @@ export function CampoSelector({ icono: Icono, texto, placeholder, onClick, disab
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="input flex items-center gap-2 text-left disabled:opacity-60 disabled:cursor-not-allowed"
+      className="input flex items-center gap-2 text-left min-h-[44px] sm:min-h-0 disabled:opacity-60 disabled:cursor-not-allowed"
     >
       {Icono && <Icono className="w-4 h-4 text-gray-400 flex-shrink-0" />}
       <span className={`flex-1 truncate ${texto ? '' : 'text-gray-400 dark:text-gray-500'}`}>
@@ -101,20 +101,20 @@ export default function SelectorBuscable({
   // En document.body: así no lo recorta ni lo desplaza el modal de la tarea
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 bg-black/30 dark:bg-black/50"
+      className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-0 sm:p-4 bg-black/30 dark:bg-black/50"
       onMouseDown={e => e.target === e.currentTarget && onCerrar()}
     >
       <div
         role="dialog"
         aria-label={titulo}
-        className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-[75vh] animate-fade-in"
+        className="w-full max-w-md bg-white dark:bg-gray-900 rounded-b-2xl sm:rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-[70dvh] sm:max-h-[75vh] animate-fade-in"
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">{titulo}</h3>
           <button
             type="button"
             onClick={onCerrar}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
+            className="p-2.5 sm:p-1.5 -mr-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
             aria-label="Cerrar"
           >
             <X className="w-4 h-4" />
@@ -136,7 +136,7 @@ export default function SelectorBuscable({
           </div>
         </div>
 
-        <div ref={listaRef} className="flex-1 overflow-y-auto px-2 pb-2" role="listbox">
+        <div ref={listaRef} className="flex-1 overflow-y-auto overscroll-contain px-2 pb-2" role="listbox">
           {filtradas.length === 0 && (
             <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-8 px-4">
               {q ? `Sin resultados para "${q}"` : vacio}
@@ -160,7 +160,7 @@ export default function SelectorBuscable({
                   aria-selected={elegido}
                   onMouseEnter={() => setActivo(i)}
                   onClick={() => elegir(o)}
-                  className={`w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left transition-colors ${
+                  className={`w-full flex items-center gap-3 px-2 py-2 min-h-[44px] sm:min-h-0 rounded-lg text-left transition-colors ${
                     i === activo ? 'bg-gray-100 dark:bg-gray-800' : ''
                   }`}
                 >

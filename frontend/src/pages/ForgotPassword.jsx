@@ -14,10 +14,10 @@ export default function ForgotPassword() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-600 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6 sm:mb-8">
           <img src={logo} alt="USO Projects" className="h-16 w-auto object-contain drop-shadow-lg" />
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 border border-transparent dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 sm:p-8 border border-transparent dark:border-gray-700">
           {token ? <NuevaContrasena token={token} /> : <PedirEnlace />}
         </div>
       </div>
@@ -114,11 +114,11 @@ function NuevaContrasena({ token }) {
           <label className="label">Contraseña nueva</label>
           <div className="relative">
             <input
-              type={ver ? 'text' : 'password'} className="input pr-10" autoComplete="new-password"
+              type={ver ? 'text' : 'password'} className="input pr-12 sm:pr-10" autoComplete="new-password"
               value={form.nueva} onChange={e => setForm({ ...form, nueva: e.target.value })} required
             />
             <button type="button" onClick={() => setVer(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 p-2.5 sm:p-0 text-gray-400 hover:text-gray-600"
               aria-label={ver ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
               {ver ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -139,7 +139,7 @@ function NuevaContrasena({ token }) {
         </button>
       </form>
       <div className="mt-4 text-center">
-        <Link to="/forgot-password" className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+        <Link to="/forgot-password" className="inline-block py-2 sm:py-0 text-sm text-primary-600 dark:text-primary-400 hover:underline">
           Pedir un enlace nuevo
         </Link>
       </div>
@@ -150,7 +150,7 @@ function NuevaContrasena({ token }) {
 function VolverLogin() {
   return (
     <div className="mt-4 text-center">
-      <Link to="/login" className="flex items-center justify-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+      <Link to="/login" className="flex items-center justify-center gap-1 py-2 sm:py-0 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
         <ArrowLeft className="w-3.5 h-3.5" /> Volver al inicio de sesión
       </Link>
     </div>

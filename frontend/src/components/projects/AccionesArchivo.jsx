@@ -87,9 +87,9 @@ function ConfirmarEliminar({ proyecto, onCancel, onEliminado }) {
         <input className="input" value={texto} onChange={e => setTexto(e.target.value)} autoFocus autoComplete="off" />
       </div>
 
-      <div className="flex gap-2 justify-end">
-        <button type="button" onClick={onCancel} className="btn-secondary text-sm">Cancelar</button>
-        <button type="submit" disabled={!coincide || eliminando} className="btn-danger text-sm disabled:opacity-50">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+        <button type="button" onClick={onCancel} className="btn-secondary text-sm w-full sm:w-auto justify-center">Cancelar</button>
+        <button type="submit" disabled={!coincide || eliminando} className="btn-danger text-sm disabled:opacity-50 w-full sm:w-auto justify-center">
           {eliminando
             ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             : <><Trash2 className="w-4 h-4" /> Eliminar</>}

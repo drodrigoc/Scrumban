@@ -120,10 +120,10 @@ export default function MyTasks() {
   const totalDone       = tasks.filter(t => t.status === 'completed').length;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <CheckSquare className="w-6 h-6 text-primary-600 dark:text-primary-400" />
           Mis Tareas
         </h1>
@@ -133,14 +133,14 @@ export default function MyTasks() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: 'Pendientes',   value: totalPending,    color: 'text-gray-700 dark:text-gray-300' },
           { label: 'En Proceso',   value: totalInProgress, color: 'text-blue-600 dark:text-blue-400' },
           { label: 'Vencidas',     value: totalOverdue,    color: 'text-red-600 dark:text-red-400' },
           { label: 'Completadas',  value: totalDone,       color: 'text-green-600 dark:text-green-400' },
         ].map(s => (
-          <div key={s.label} className="card p-4 text-center">
+          <div key={s.label} className="card p-3 sm:p-4 text-center">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{s.label}</p>
           </div>
@@ -148,12 +148,12 @@ export default function MyTasks() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4 flex flex-wrap gap-3 items-end">
-        <Filter className="w-4 h-4 text-gray-400 self-center" />
+      <div className="card p-3 sm:p-4 grid grid-cols-2 sm:flex sm:flex-wrap gap-3 items-end">
+        <Filter className="hidden sm:block w-4 h-4 text-gray-400 self-center" />
 
-        <div className="flex flex-col gap-1 min-w-[140px]">
+        <div className="flex flex-col gap-1 min-w-0 sm:min-w-[140px]">
           <label className="text-xs text-gray-500 dark:text-gray-400">Estado</label>
-          <select className="input py-1.5 text-sm" value={filterStatus} onChange={e => setFStatus(e.target.value)}>
+          <select className="input py-2.5 sm:py-1.5 text-sm" value={filterStatus} onChange={e => setFStatus(e.target.value)}>
             <option value="">Todos</option>
             {Object.entries(STATUS_CONFIG).map(([v, c]) => (
               <option key={v} value={v}>{c.label}</option>
@@ -161,9 +161,9 @@ export default function MyTasks() {
           </select>
         </div>
 
-        <div className="flex flex-col gap-1 min-w-[130px]">
+        <div className="flex flex-col gap-1 min-w-0 sm:min-w-[130px]">
           <label className="text-xs text-gray-500 dark:text-gray-400">Prioridad</label>
-          <select className="input py-1.5 text-sm" value={filterPriority} onChange={e => setFPrio(e.target.value)}>
+          <select className="input py-2.5 sm:py-1.5 text-sm" value={filterPriority} onChange={e => setFPrio(e.target.value)}>
             <option value="">Todas</option>
             {Object.entries(PRIORITY_CONFIG).map(([v, c]) => (
               <option key={v} value={v}>{c.label}</option>
@@ -171,9 +171,9 @@ export default function MyTasks() {
           </select>
         </div>
 
-        <div className="flex flex-col gap-1 min-w-[160px]">
+        <div className="flex flex-col gap-1 min-w-0 col-span-2 sm:col-span-1 sm:min-w-[160px]">
           <label className="text-xs text-gray-500 dark:text-gray-400">Proyecto</label>
-          <select className="input py-1.5 text-sm" value={filterProject} onChange={e => setFProj(e.target.value)}>
+          <select className="input py-2.5 sm:py-1.5 text-sm" value={filterProject} onChange={e => setFProj(e.target.value)}>
             <option value="">Todos</option>
             {projectOptions.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -183,14 +183,14 @@ export default function MyTasks() {
 
         {(filterStatus || filterPriority || filterProject) && (
           <button
-            className="btn-secondary text-xs py-1.5 px-3 self-end"
+            className="btn-secondary text-xs py-2.5 sm:py-1.5 px-3 self-end w-full sm:w-auto justify-center"
             onClick={() => { setFStatus(''); setFPrio(''); setFProj(''); }}
           >
             Limpiar
           </button>
         )}
 
-        <span className="ml-auto self-end text-sm text-gray-400 dark:text-gray-500">
+        <span className="sm:ml-auto self-center sm:self-end text-sm text-gray-400 dark:text-gray-500 text-right sm:text-left">
           {filtered.length} tarea{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -217,7 +217,7 @@ export default function MyTasks() {
                 {/* Group header */}
                 <button
                   onClick={() => toggleGroup(status)}
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3.5 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     {open ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
@@ -237,14 +237,14 @@ export default function MyTasks() {
                         <div
                           key={task.id}
                           onClick={() => openTask(task)}
-                          className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer group transition-colors"
+                          className="flex items-start gap-3 px-3 sm:px-4 py-3.5 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer group transition-colors"
                         >
                           {/* Priority icon */}
                           <PIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${pc.color}`} />
 
                           {/* Main info */}
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
+                            <p className={`text-sm font-medium break-words sm:truncate ${task.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-800 dark:text-gray-200'}`}>
                               {task.title}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -273,7 +273,8 @@ export default function MyTasks() {
                           <Link
                             to={`/projects/${task.project_id}`}
                             onClick={e => e.stopPropagation()}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-opacity"
+                            aria-label="Ver proyecto"
+                            className="opacity-0 group-hover:opacity-100 p-2.5 -m-1.5 sm:p-1 sm:m-0 rounded text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-opacity"
                             title="Ver proyecto"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />

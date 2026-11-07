@@ -66,14 +66,14 @@ export default function UnitsAdmin() {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Unidades Organizacionales</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {units.length} unidad{units.length !== 1 ? 'es' : ''} registrada{units.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button onClick={openCreate} className="btn-primary">
+        <button onClick={openCreate} className="btn-primary w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4" /> Nueva Unidad
         </button>
       </div>
@@ -144,7 +144,7 @@ export default function UnitsAdmin() {
                 </p>
               </div>
             )}
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
               <button className="btn-secondary flex-1" onClick={() => setDeleting(null)}>Cancelar</button>
               <button className="btn-danger flex-1" onClick={() => handleDelete(deleting)}>Eliminar</button>
             </div>
@@ -181,15 +181,15 @@ function UnitCard({ unit, onEdit, onDelete }) {
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
             onClick={onEdit}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-            title="Editar"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+            title="Editar" aria-label="Editar"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-            title="Eliminar"
+            className="p-2.5 sm:p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            title="Eliminar" aria-label="Eliminar"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -248,7 +248,7 @@ function UnitForm({ unit, onSave, onCancel }) {
           onChange={e => setForm({ ...form, description: e.target.value })}
         />
       </div>
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
         <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
         <button type="submit" disabled={saving || !form.name.trim()} className="btn-primary flex-1">
           {saving

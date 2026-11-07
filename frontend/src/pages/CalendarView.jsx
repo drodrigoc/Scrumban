@@ -99,6 +99,10 @@ function computeWeekTasks(week, tasks, colorMap) {
 
 const TASK_H   = 22; // altura px de cada barra de tarea
 const TASK_GAP = 2;  // gap entre barras
+// En el móvil las barras son franjas de color (sin texto): las tareas se
+// leen en la lista del día que se toca
+const TASK_H_MOVIL   = 8;
+const TASK_GAP_MOVIL = 3;
 const DAY_H    = 36; // altura px de la cabecera con el número del día
 
 export default function CalendarView() {
@@ -112,6 +116,17 @@ export default function CalendarView() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showModal,   setShowModal]   = useState(false);
   const [loading,     setLoading]     = useState(true);
+  const [selectedDay, setSelectedDay] = useState(new Date());
+  const [movil, setMovil] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const alCambiar = (e) => setMovil(e.matches);
+    mq.addEventListener('change', alCambiar);
+    return () => mq.removeEventListener('change', alCambiar);
+  }, []);
 
   useEffect(() => {
     // Columnas del proyecto (compartidas por el equipo, desde la BD)
@@ -155,6 +170,20 @@ export default function CalendarView() {
     weeks.map(w => computeWeekTasks(w, tasks, colorMap)),
   [weeks, tasks, colorMap]);
 
+  const taskH   = movil ? TASK_H_MOVIL : TASK_H;
+  const taskGap = movil ? TASK_GAP_MOVIL : TASK_GAP;
+
+  // Tareas que caen en el día elegido (lista del móvil)
+  const tareasDelDia = useMemo(() => tasks.filter(t => {
+    const s = parseDate(t.start_date);
+    const e = parseDate(t.due_date);
+    const ini = s ?? e;
+    const fin = e ?? s;
+    if (!ini) return false;
+    const d = new Date(selectedDay.getFullYear(), selectedDay.getMonth(), selectedDay.getDate());
+    return ini <= d && fin >= d;
+  }), [tasks, selectedDay]);
+
   const handleTaskClick = async (task) => {
     try {
       const { data } = await tasksAPI.getById(projectId, task.id);
@@ -184,23 +213,23 @@ export default function CalendarView() {
 
       {/* Controles de navegación */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="btn-secondary p-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="btn-secondary p-2.5 sm:p-2" aria-label="Mes anterior">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="font-semibold text-gray-700 dark:text-gray-300 w-40 text-center capitalize">
+          <span className="font-semibold text-gray-700 dark:text-gray-300 flex-1 sm:flex-none sm:w-40 text-center capitalize">
             {format(currentDate, 'MMMM yyyy', { locale: es })}
           </span>
-          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="btn-secondary p-2">
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="btn-secondary p-2.5 sm:p-2" aria-label="Mes siguiente">
             <ChevronRight className="w-4 h-4" />
           </button>
-          <button onClick={() => setCurrentDate(new Date())} className="btn-secondary text-sm px-3 py-1.5">
+          <button onClick={() => { setCurrentDate(new Date()); setSelectedDay(new Date()); }} className="btn-secondary text-sm px-3 py-2 sm:py-1.5">
             Hoy
           </button>
         </div>
 
         {/* Leyenda de estados dinámica */}
-        <div className="flex gap-4 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex gap-x-4 gap-y-1 flex-wrap text-xs text-gray-500 dark:text-gray-400">
           {columns.map((col, i) => (
             <span key={col.id} className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COL_PALETTE[i % COL_PALETTE.length] }} />
@@ -231,7 +260,7 @@ export default function CalendarView() {
           const maxSlot   = weekTasks.length > 0
             ? Math.max(...weekTasks.map(t => t.slot)) + 1
             : 0;
-          const tasksAreaH = maxSlot * (TASK_H + TASK_GAP) + 6;
+          const tasksAreaH = maxSlot * (taskH + taskGap) + 6;
 
           return (
             <div key={wi} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
@@ -241,10 +270,12 @@ export default function CalendarView() {
                 {week.map((day, di) => {
                   const inMonth = isSameMonth(day, currentDate);
                   const today   = isToday(day);
+                  const elegido = isSameDay(day, selectedDay);
                   return (
                     <div
                       key={di}
-                      className={`border-r border-gray-100 dark:border-gray-800 last:border-r-0 px-2 pt-1.5 pb-0.5 ${
+                      onClick={() => setSelectedDay(day)}
+                      className={`border-r border-gray-100 dark:border-gray-800 last:border-r-0 px-0 sm:px-2 pt-1.5 pb-0.5 flex justify-center sm:block cursor-pointer sm:cursor-default ${
                         !inMonth ? 'bg-gray-50/60 dark:bg-gray-800/30' : ''
                       }`}
                       style={{ height: DAY_H }}
@@ -255,7 +286,7 @@ export default function CalendarView() {
                           : inMonth
                             ? 'text-gray-700 dark:text-gray-300'
                             : 'text-gray-300 dark:text-gray-600'
-                      }`}>
+                      } ${elegido && !today ? 'ring-2 ring-primary-500 sm:ring-0' : ''}`}>
                         {format(day, 'd')}
                       </span>
                     </div>
@@ -288,14 +319,14 @@ export default function CalendarView() {
 
                 {/* Barras de tarea */}
                 {weekTasks.map(task => {
-                  const top   = task.slot * (TASK_H + TASK_GAP) + 3;
+                  const top   = task.slot * (taskH + taskGap) + 3;
                   const left  = `${((task.colStart - 1) / 7) * 100}%`;
                   const width = `${(task.colSpan  / 7) * 100}%`;
                   const color = task.color; // ya calculado en computeWeekTasks (rojo si vencida)
 
                   // Redondeo según posición en la semana
-                  const rLeft  = task.isStart ? '6px' : '0px';
-                  const rRight = task.isEnd   ? '6px' : '0px';
+                  const rLeft  = task.isStart ? (movil ? '4px' : '6px') : '0px';
+                  const rRight = task.isEnd   ? (movil ? '4px' : '6px') : '0px';
 
                   return (
                     <button
@@ -307,20 +338,20 @@ export default function CalendarView() {
                         top,
                         left,
                         width,
-                        height: TASK_H,
-                        backgroundColor: color + '30',
-                        borderTop:    `2px solid ${color}`,
-                        borderBottom: `2px solid ${color}`,
-                        borderLeft:   task.isStart ? `2px solid ${color}` : 'none',
-                        borderRight:  task.isEnd   ? `2px solid ${color}` : 'none',
+                        height: taskH,
+                        backgroundColor: movil ? color : color + '30',
+                        borderTop:    movil ? 'none' : `2px solid ${color}`,
+                        borderBottom: movil ? 'none' : `2px solid ${color}`,
+                        borderLeft:   !movil && task.isStart ? `2px solid ${color}` : 'none',
+                        borderRight:  !movil && task.isEnd   ? `2px solid ${color}` : 'none',
                         borderRadius: `${rLeft} ${rRight} ${rRight} ${rLeft}`,
-                        paddingLeft:  task.isStart ? 6 : 0,
-                        paddingRight: task.isEnd   ? 6 : 0,
+                        paddingLeft:  !movil && task.isStart ? 6 : 0,
+                        paddingRight: !movil && task.isEnd   ? 6 : 0,
                         zIndex: 10,
                       }}
                     >
                       {/* Mostrar título solo en el primer segmento visible */}
-                      {task.isStart && (
+                      {!movil && task.isStart && (
                         <span
                           className="truncate text-xs font-semibold whitespace-nowrap"
                           style={{ color }}
@@ -329,7 +360,7 @@ export default function CalendarView() {
                         </span>
                       )}
                       {/* Si el inicio está fuera de la semana, mostrar título igualmente */}
-                      {!task.isStart && (
+                      {!movil && !task.isStart && (
                         <span
                           className="truncate text-xs font-semibold whitespace-nowrap pl-1"
                           style={{ color }}
@@ -345,6 +376,35 @@ export default function CalendarView() {
             </div>
           );
         })}
+      </div>
+
+      {/* Móvil: tareas del día tocado */}
+      <div className="sm:hidden card p-4 space-y-2">
+        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 capitalize">
+          {format(selectedDay, "EEEE d 'de' MMMM", { locale: es })}
+        </p>
+        {tareasDelDia.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">No hay tareas este día.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {tareasDelDia.map(t => {
+              const color = t.isOverdue ?? (estaVencida(t.due_date) && t.status !== 'completed')
+                ? '#EF4444'
+                : (colorMap[t.status] ?? '#6B7280');
+              return (
+                <li key={t.id}>
+                  <button
+                    onClick={() => handleTaskClick(t)}
+                    className="w-full flex items-center gap-2.5 text-left px-3 py-2.5 rounded-lg border border-gray-100 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-800"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                    <span className="text-sm text-gray-700 dark:text-gray-300 min-w-0 break-words">{t.title}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       {/* Modal de tarea */}

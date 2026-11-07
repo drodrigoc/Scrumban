@@ -141,14 +141,14 @@ export default function ActividadTab() {
           <option value="">Todas las acciones</option>
           {Object.entries(ACCIONES).map(([k, a]) => <option key={k} value={k}>{a.label}</option>)}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          Desde
-          <input type="date" className="input text-sm py-1 w-36" value={filtros.desde}
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 w-full sm:w-auto">
+          <span className="w-12 sm:w-auto flex-shrink-0">Desde</span>
+          <input type="date" className="input text-sm py-1 flex-1 sm:flex-none sm:w-36 min-w-0" value={filtros.desde}
             max={filtros.hasta || undefined} onChange={e => cambiar('desde', e.target.value)} />
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          Hasta
-          <input type="date" className="input text-sm py-1 w-36" value={filtros.hasta}
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 w-full sm:w-auto">
+          <span className="w-12 sm:w-auto flex-shrink-0">Hasta</span>
+          <input type="date" className="input text-sm py-1 flex-1 sm:flex-none sm:w-36 min-w-0" value={filtros.hasta}
             min={filtros.desde || undefined} onChange={e => cambiar('hasta', e.target.value)} />
         </label>
         {hayFiltros && (
@@ -189,13 +189,13 @@ export default function ActividadTab() {
                     const conf = ACCIONES[item.accion] || ACCIONES.subida;
                     const Icono = conf.icono;
                     return (
-                      <li key={item.id} className="flex items-start gap-3 px-4 py-3">
+                      <li key={item.id} className="flex items-start gap-2 sm:gap-3 px-3 sm:px-4 py-3">
                         <span className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${conf.color}`}>
                           <Icono className="w-4 h-4" aria-hidden="true" />
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-700 dark:text-gray-300"><Frase item={item} /></p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-words sm:truncate">
                             {hora(item.created_at)}
                             {item.task_titulo && ` · ${item.task_titulo}`}
                             {item.project_name && ` · ${item.project_name}`}
@@ -206,7 +206,7 @@ export default function ActividadTab() {
                             <button
                               type="button" onClick={() => verTarea.abrir(item.project_id, item.task_id)} disabled={verTarea.cargando}
                               title="Ver la tarea" aria-label="Ver la tarea"
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-primary-400"
+                              className="p-2.5 sm:p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-primary-400"
                             >
                               <ExternalLink className="w-4 h-4" />
                             </button>
@@ -228,7 +228,7 @@ export default function ActividadTab() {
 
           {items.length < total && (
             <div className="text-center">
-              <button onClick={cargarMas} disabled={cargandoMas} className="btn-secondary text-sm">
+              <button onClick={cargarMas} disabled={cargandoMas} className="btn-secondary text-sm w-full sm:w-auto justify-center">
                 {cargandoMas
                   ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   : `Cargar ${Math.min(porPagina, total - items.length)} más`}

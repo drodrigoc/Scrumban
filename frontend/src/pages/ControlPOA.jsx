@@ -130,11 +130,11 @@ export default function ControlPOA() {
               <p className="font-semibold text-gray-900 dark:text-gray-100">Todos a la vez</p>
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => masivo(true)} disabled={!!ocupado || datos.resumen.total === datos.resumen.bloqueados}
-                  className="btn-primary text-sm">
+                  className="btn-primary text-sm flex-1 sm:flex-none justify-center">
                   <Lock className="w-4 h-4" /> Bloquear todos
                 </button>
                 <button onClick={() => masivo(false)} disabled={!!ocupado || datos.resumen.bloqueados === 0}
-                  className="btn-secondary text-sm">
+                  className="btn-secondary text-sm flex-1 sm:flex-none justify-center">
                   <Unlock className="w-4 h-4" /> Desbloquear todos
                 </button>
               </div>
@@ -151,7 +151,7 @@ export default function ControlPOA() {
                     Todos los proyectos POA se bloquearán el <b>{fechaHora(datos.cierre.fecha)}</b>
                     {datos.cierre.programado_por && <span className="text-gray-500 dark:text-gray-400"> · programado por {datos.cierre.programado_por}</span>}.
                   </p>
-                  <button onClick={() => programar(null)} disabled={!!ocupado} className="btn-secondary text-sm">
+                  <button onClick={() => programar(null)} disabled={!!ocupado} className="btn-secondary text-sm w-full sm:w-auto justify-center">
                     Cancelar cierre
                   </button>
                 </>
@@ -160,7 +160,7 @@ export default function ControlPOA() {
                   <div className="space-y-2">
                     <input type="datetime-local" className="input" value={nuevaFecha}
                       onChange={e => setNuevaFecha(e.target.value)} aria-label="Fecha y hora del cierre" />
-                    <button onClick={() => programar(nuevaFecha)} disabled={!nuevaFecha || !!ocupado} className="btn-primary text-sm">
+                    <button onClick={() => programar(nuevaFecha)} disabled={!nuevaFecha || !!ocupado} className="btn-primary text-sm w-full sm:w-auto justify-center">
                       <CalendarClock className="w-4 h-4" /> Programar cierre
                     </button>
                   </div>
@@ -174,8 +174,8 @@ export default function ControlPOA() {
           </div>
 
           <div className="card">
-            <div className="p-4 flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-700">
-              <div className="relative flex-1 min-w-[220px]">
+            <div className="p-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 border-b border-gray-100 dark:border-gray-700">
+              <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-[220px]">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input className="input pl-9 pr-8" placeholder="Buscar por proyecto, responsable, unidad o aprobación…"
                   value={q} onChange={e => setQ(e.target.value)} />
@@ -185,10 +185,10 @@ export default function ControlPOA() {
                   </button>
                 )}
               </div>
-              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
+              <div className="flex w-full sm:w-auto rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
                 {[['todos', 'Todos'], ['abiertos', 'Abiertos'], ['bloqueados', 'Bloqueados']].map(([id, label]) => (
                   <button key={id} onClick={() => setFiltro(id)}
-                    className={`px-3 py-1.5 ${filtro === id
+                    className={`flex-1 sm:flex-none px-3 py-2.5 sm:py-1.5 ${filtro === id
                       ? 'bg-primary-600 text-white'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                     {label}
@@ -204,7 +204,7 @@ export default function ControlPOA() {
             ) : visibles.length === 0 ? (
               <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-10">Sin resultados.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overscroll-x-contain">
                 <table className="w-full text-sm min-w-[760px]">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">

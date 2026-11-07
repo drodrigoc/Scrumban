@@ -147,15 +147,15 @@ export default function GanttView() {
     <div className="space-y-5 animate-fade-in">
       <ViewNavBar projectName={project?.name} projectColor={project?.color} />
 
-      <div className="flex items-center justify-end flex-wrap gap-2">
-        <button onClick={() => setViewStart(subWeeks(viewStart, 2))} className="btn-secondary p-2">
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={() => setViewStart(subWeeks(viewStart, 2))} className="btn-secondary p-2.5 sm:p-2" aria-label="Semanas anteriores">
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <button onClick={() => setViewStart(startOfWeek(new Date(), { weekStartsOn: 1 }))} className="btn-secondary text-sm px-3 py-1.5">Hoy</button>
-        <button onClick={() => setViewStart(addWeeks(viewStart, 2))} className="btn-secondary p-2">
+        <button onClick={() => setViewStart(startOfWeek(new Date(), { weekStartsOn: 1 }))} className="btn-secondary text-sm px-3 py-2 sm:py-1.5">Hoy</button>
+        <button onClick={() => setViewStart(addWeeks(viewStart, 2))} className="btn-secondary p-2.5 sm:p-2" aria-label="Semanas siguientes">
           <ChevronRight className="w-4 h-4" />
         </button>
-        <select value={weeksCount} onChange={e => setWeeksCount(parseInt(e.target.value))} className="input py-1.5 w-auto text-sm">
+        <select value={weeksCount} onChange={e => setWeeksCount(parseInt(e.target.value))} className="input py-2 sm:py-1.5 w-auto text-sm min-w-0">
           <option value={4}>4 semanas</option>
           <option value={8}>8 semanas</option>
           <option value={12}>12 semanas</option>
@@ -189,6 +189,9 @@ export default function GanttView() {
         </div>
       ) : (
         <div className="card overflow-hidden">
+          <p className="sm:hidden text-xs text-gray-400 dark:text-gray-500 px-3 py-1.5 border-b border-gray-100 dark:border-gray-700">
+            Desliza hacia los lados para ver todo el cronograma.
+          </p>
           <div className="overflow-x-auto">
             <div style={{ minWidth: '900px' }}>
               {/* Header */}

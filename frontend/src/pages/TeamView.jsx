@@ -49,7 +49,7 @@ function TaskRow({ task }) {
     <tr className={`text-sm border-b border-gray-50 dark:border-gray-800 last:border-0 ${
       overdue ? 'bg-red-50/40 dark:bg-red-950/20' : ''
     }`}>
-      <td className="py-2 pr-3 pl-2">
+      <td className="py-2 pr-3 pl-2 min-w-[160px]">
         <span className="text-gray-700 dark:text-gray-300 font-medium line-clamp-1">{task.title}</span>
       </td>
       <td className="py-2 pr-3">
@@ -178,8 +178,8 @@ function MemberRow({ member }) {
             {member.tasks.length === 0 ? (
               <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-3">Sin tareas asignadas</p>
             ) : (
-              <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
-                <table className="w-full text-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-gray-700 overflow-x-auto bg-white dark:bg-gray-900">
+                <table className="w-full text-sm min-w-[520px]">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider">
                       <th className="text-left py-2 pr-3 pl-2">Tarea</th>
@@ -199,6 +199,112 @@ function MemberRow({ member }) {
         </tr>
       )}
     </>
+  );
+}
+
+// Tarjeta de miembro para móvil
+function MemberCard({ member }) {
+  const [expanded, setExpanded] = useState(false);
+  const totalT     = Number(member.total_tasks)     || 0;
+  const completedT = Number(member.completed_tasks) || 0;
+  const progress   = totalT > 0 ? Math.round((completedT / totalT) * 100) : 0;
+  const roleInfo = roleConfig[member.role] || roleConfig.member;
+  const overdueTasks = member.tasks.filter(t => estaVencida(t.due_date) && t.status !== 'completed');
+
+  return (
+    <div className="card overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        aria-expanded={expanded}
+        className="w-full text-left p-4 space-y-3"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-sm flex-shrink-0">
+            {member.name?.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{member.name}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{member.email}</p>
+          </div>
+          {expanded
+            ? <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            : <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`badge ${roleInfo.color}`}>{roleInfo.label}</span>
+          {member.unit && (
+            <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+              <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" /><span className="truncate">{member.unit}</span>
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="text-gray-500 dark:text-gray-400">{totalT} total</span>
+          {overdueTasks.length > 0 && (
+            <span className="text-red-600 dark:text-red-400 font-semibold">
+              · {overdueTasks.length} vencida{overdueTasks.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {[
+            { v: Number(member.pending_tasks)     || 0, c: 'bg-gray-300 dark:bg-gray-600', title: 'Pendiente' },
+            { v: Number(member.in_progress_tasks) || 0, c: 'bg-blue-400',                  title: 'En Proceso' },
+            { v: Number(member.in_review_tasks)   || 0, c: 'bg-amber-400',                 title: 'En Revisión' },
+            { v: Number(member.completed_tasks)   || 0, c: 'bg-green-400',                 title: 'Completada' },
+          ].map(({ v, c, title }) => v > 0 && (
+            <span key={title}
+              className={`inline-flex items-center justify-center h-5 rounded-full px-2 text-xs font-medium text-white ${c}`}>
+              {title}: {v}
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+            <div className="h-1.5 rounded-full bg-primary-500 transition-all" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">{progress}%</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100 dark:border-gray-700 bg-gray-50/40 dark:bg-gray-800/20 divide-y divide-gray-100 dark:divide-gray-800">
+          {member.tasks.length === 0 ? (
+            <p className="text-sm text-center text-gray-400 dark:text-gray-500 py-3">Sin tareas asignadas</p>
+          ) : member.tasks.map(task => {
+            const due = task.due_date ? diaLocal(task.due_date) : null;
+            const overdue = estaVencida(task.due_date) && task.status !== 'completed';
+            const dueToday = due && isToday(due) && task.status !== 'completed';
+            const st = statusConfig[task.status] || statusConfig.pending;
+            const pr = priorityConfig[task.priority] || priorityConfig.medium;
+            return (
+              <div key={task.id} className={`px-4 py-3 space-y-1.5 ${overdue ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 break-words">{task.title}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className={`badge text-xs ${st.color}`}>{st.label}</span>
+                  <span className={`text-xs font-medium ${pr.color}`}>{pr.label}</span>
+                  {due && (
+                    <span className={`text-xs ${
+                      overdue  ? 'text-red-600 dark:text-red-400 font-semibold' :
+                      dueToday ? 'text-amber-600 dark:text-amber-400 font-semibold' :
+                                 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {overdue && <AlertTriangle className="inline w-3 h-3 mr-0.5" />}
+                      {format(due, 'd MMM', { locale: es })}
+                    </span>
+                  )}
+                </div>
+                {task.project_name && (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: task.project_color }} />
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{task.project_name}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -268,7 +374,7 @@ export default function TeamView() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Seguimiento de Equipo</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">{members.length} miembro{members.length !== 1 ? 's' : ''} activo{members.length !== 1 ? 's' : ''}</p>
@@ -293,7 +399,7 @@ export default function TeamView() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
+        <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text" placeholder="Buscar miembro..."
@@ -302,20 +408,30 @@ export default function TeamView() {
           />
         </div>
         {!restricted && (
-          <select value={filterUnit} onChange={e => setFilterUnit(e.target.value)} className="input w-auto">
+          <select value={filterUnit} onChange={e => setFilterUnit(e.target.value)} className="input w-full sm:w-auto">
             <option value="all">Todas las unidades</option>
             {units.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
         )}
-        <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="input w-auto">
+        <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="input w-full sm:w-auto">
           <option value="all">Todos los roles</option>
           <option value="coordinator">Coordinador</option>
           <option value="member">Miembro</option>
         </select>
       </div>
 
+      {/* Móvil: tarjetas */}
+      <div className="sm:hidden space-y-3">
+        {filtered.length === 0 ? (
+          <div className="card p-8 text-center text-gray-400 dark:text-gray-500">
+            <ListFilter className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            No hay miembros que coincidan
+          </div>
+        ) : filtered.map(m => <MemberCard key={m.id} member={m} />)}
+      </div>
+
       {/* Members table */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-hidden hidden sm:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

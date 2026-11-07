@@ -233,7 +233,7 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
 
   return (
     <div className="card p-5 space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-primary-500" />
@@ -252,7 +252,7 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
           )}
         </div>
         {canEdit && !showForm && (
-          <button onClick={openNew} className="btn-secondary text-xs py-1.5 px-3">
+          <button onClick={openNew} className="btn-secondary text-xs py-2.5 sm:py-1.5 px-3 w-full sm:w-auto justify-center">
             <Plus className="w-3.5 h-3.5" /> Nueva partida
           </button>
         )}
@@ -295,9 +295,9 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
               onChange={e => setForm({ ...form, monto_ejecutado: e.target.value })}
             />
           </div>
-          <div className="flex gap-2 justify-end">
-            <button onClick={closeForm} className="btn-secondary text-sm py-1.5 px-4">Cancelar</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-1.5 px-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <button onClick={closeForm} className="btn-secondary text-sm py-2.5 sm:py-1.5 px-4 w-full sm:w-auto">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-2.5 sm:py-1.5 px-4 w-full sm:w-auto">
               {saving
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : 'Guardar'}
@@ -381,9 +381,9 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end">
-            <button onClick={closeForm} className="btn-secondary text-sm py-1.5 px-4">Cancelar</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-1.5 px-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <button onClick={closeForm} className="btn-secondary text-sm py-2.5 sm:py-1.5 px-4 w-full sm:w-auto">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-2.5 sm:py-1.5 px-4 w-full sm:w-auto">
               {saving
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : (editingId ? 'Guardar cambios' : 'Agregar partida')
@@ -400,7 +400,23 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
           {canEdit ? ' Arma el presupuesto con "Nueva partida" cuando tengas el cronograma.' : ''}
         </p>
       ) : (
-        <div className="overflow-x-auto -mx-1">
+        <>
+        {/* Móvil: una tarjeta por partida */}
+        <div className="sm:hidden space-y-5">
+          {fijos.length > 0 && (
+            <GrupoMovil titulo="Costos fijos" rows={fijos}
+              canEdit={canEdit} soloEjecucion={soloEjecucion} abiertas={abiertas} alternar={alternar}
+              onEdit={openEdit} onDelete={handleDelete} />
+          )}
+          {(variables.length > 0 || sinPartida.total > 0) && (
+            <GrupoMovil titulo="Costos variables" rows={variables}
+              canEdit={canEdit} soloEjecucion={soloEjecucion} abiertas={abiertas} alternar={alternar}
+              onEdit={openEdit} onDelete={handleDelete}
+              sinPartida={sinPartida} />
+          )}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto -mx-1">
           <table className="w-full text-sm min-w-[680px]">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
@@ -427,6 +443,7 @@ export default function BudgetPanel({ projectId, canEdit, soloEjecucion = false 
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
@@ -442,7 +459,7 @@ function Resumen({ summary, fijosOcultos }) {
       <Dona porcentaje={pct} trazo={c.trazo} />
 
       <div className="flex-1 w-full space-y-3">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
           <Cifra etiqueta="Presupuesto" valor={fmt(summary.presupuesto)} />
           <Cifra etiqueta="Ejecutado"   valor={fmt(summary.ejecutado)} />
           <Cifra
@@ -492,8 +509,8 @@ function Dona({ porcentaje, trazo }) {
 
 function Cifra({ etiqueta, valor, clase = 'text-gray-900 dark:text-gray-100' }) {
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{etiqueta}</p>
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 flex items-center justify-between gap-3 sm:block sm:text-center">
+      <p className="text-xs text-gray-500 dark:text-gray-400 sm:mb-1">{etiqueta}</p>
       <p className={`text-base sm:text-lg font-bold tabular-nums ${clase}`}>{valor}</p>
     </div>
   );
@@ -523,25 +540,148 @@ function Disponible({ valor }) {
   );
 }
 
+function ItemsTareas({ tareas, className = 'ml-8' }) {
+  return (
+    <ul className={`${className} border-l-2 border-gray-100 dark:border-gray-700 pl-3 space-y-1`}>
+      {tareas.map(t => (
+        <li key={t.id} className="flex items-center justify-between gap-3 text-xs">
+          <span className="text-gray-600 dark:text-gray-300 truncate min-w-0">
+            {t.title}
+            <span className="text-gray-400 dark:text-gray-500">
+              {' · '}{t.archived_at ? 'Archivada' : (ESTADO_TAREA[t.status] || t.status)}
+            </span>
+          </span>
+          <span className="tabular-nums text-gray-600 dark:text-gray-300 flex-shrink-0">{fmt(t.costo)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ListaTareas({ tareas, columnas }) {
   return (
     <tr>
       <td colSpan={columnas} className="px-2 pb-2">
-        <ul className="ml-8 border-l-2 border-gray-100 dark:border-gray-700 pl-3 space-y-1">
-          {tareas.map(t => (
-            <li key={t.id} className="flex items-center justify-between gap-3 text-xs">
-              <span className="text-gray-600 dark:text-gray-300 truncate">
-                {t.title}
-                <span className="text-gray-400 dark:text-gray-500">
-                  {' · '}{t.archived_at ? 'Archivada' : (ESTADO_TAREA[t.status] || t.status)}
-                </span>
-              </span>
-              <span className="tabular-nums text-gray-600 dark:text-gray-300 flex-shrink-0">{fmt(t.costo)}</span>
-            </li>
-          ))}
-        </ul>
+        <ItemsTareas tareas={tareas} />
       </td>
     </tr>
+  );
+}
+
+// Tarjetas de partida para el móvil (misma información y acciones que la tabla)
+function GrupoMovil({ titulo, rows, canEdit, soloEjecucion, abiertas, alternar, onEdit, onDelete, sinPartida }) {
+  const extra = sinPartida?.total || 0;
+  const subEst = rows.reduce((s, r) => s + r.monto_estimado, 0);
+  const subEje = rows.reduce((s, r) => s + r.ejecutado, 0) + extra;
+  const btnAccion = 'p-2.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700';
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{titulo}</p>
+
+      {rows.map(item => {
+        const abierta = abiertas.has(item.id);
+        const pct = item.monto_estimado > 0
+          ? Math.round((item.ejecutado / item.monto_estimado) * 100)
+          : (item.ejecutado > 0 ? 101 : null);
+        const c = COLOR[tono(pct)];
+        return (
+          <div key={item.id} className="rounded-xl border border-gray-100 dark:border-gray-700 p-3 space-y-2.5">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`badge ${tipoBadge[item.tipo]}`}>{item.tipo === 'fijo' ? 'Fijo' : 'Variable'}</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 break-words">{item.categoria}</span>
+                </div>
+                {(item.descripcion || item.fecha) && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 break-words">
+                    {[item.descripcion, item.fecha?.split('T')[0]].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+              </div>
+              {(canEdit || soloEjecucion) && (
+                <div className="flex items-center gap-2 flex-shrink-0 -mt-1 -mr-1">
+                  {(canEdit || item.tipo === 'fijo') && (
+                    <button onClick={() => onEdit(item)} aria-label={canEdit ? 'Editar partida' : 'Registrar ejecutado'}
+                      className={`${btnAccion} hover:text-primary-500 dark:hover:text-primary-400`}>
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => onDelete(item)} aria-label="Eliminar partida"
+                      className={`${btnAccion} hover:text-red-500 dark:hover:text-red-400`}>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <MiniCifra etiqueta="Estimado" valor={fmt(item.monto_estimado)} />
+              <MiniCifra etiqueta="Ejecutado" valor={fmt(item.ejecutado)} />
+              <div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">Disponible</p>
+                <p className="text-xs"><Disponible valor={item.disponible} /></p>
+              </div>
+            </div>
+
+            <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+              <div className={`h-1.5 rounded-full ${c.barra}`} style={{ width: `${Math.min(pct || 0, 100)}%` }} />
+            </div>
+
+            <div className="flex items-center justify-between gap-2 text-xs">
+              {item.origen === 'manual' ? (
+                <span className="text-gray-400 dark:text-gray-500">Ejecutado a mano</span>
+              ) : item.tareas.length > 0 ? (
+                <span className="py-1"><BotonTareas n={item.tareas.length} abierta={abierta} onClick={() => alternar(item.id)} /></span>
+              ) : (
+                <span className="text-gray-400 dark:text-gray-500">Sin tareas</span>
+              )}
+              <span className={c.texto}>{pct == null ? '' : `${pct}%`}</span>
+            </div>
+            {abierta && <ItemsTareas tareas={item.tareas} className="ml-1" />}
+          </div>
+        );
+      })}
+
+      {extra > 0 && (
+        <div className="rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-900/10 p-3 space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Tareas sin partida</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                Cuentan en el ejecutado del proyecto. Asígnales una partida desde cada tarea.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="py-1">
+              <BotonTareas n={sinPartida.tareas.length} abierta={abiertas.has('sin')} onClick={() => alternar('sin')} />
+            </span>
+            <span className="tabular-nums text-sm font-medium text-gray-700 dark:text-gray-300">{fmt(extra)}</span>
+          </div>
+          {abiertas.has('sin') && <ItemsTareas tareas={sinPartida.tareas} className="ml-1" />}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-xs">
+        <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
+        <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+          {fmt(subEje)} <span className="font-normal text-gray-400 dark:text-gray-500">de</span> {fmt(subEst)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function MiniCifra({ etiqueta, valor }) {
+  return (
+    <div>
+      <p className="text-[11px] text-gray-400 dark:text-gray-500">{etiqueta}</p>
+      <p className="text-xs tabular-nums text-gray-700 dark:text-gray-300">{valor}</p>
+    </div>
   );
 }
 
