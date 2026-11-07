@@ -1,14 +1,16 @@
 const router = require('express').Router();
 const ctrl   = require('../controllers/peiController');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, authorizePEI } = require('../middleware/auth');
 
 router.use(authenticate);
 
-// El catálogo lo consulta cualquiera con sesión: se usa para alinear proyectos
+// El catálogo lo consulta cualquiera con sesión: lo usa el panel de
+// alineación de cada proyecto para elegir actividades
 router.get('/', ctrl.getArbol);
 
-// Tablero consolidado: muestra proyectos de toda la institución
-router.get('/tablero', authorize('admin', 'superViewer'), ctrl.getTablero);
+// Tablero consolidado (proyectos de toda la institución): administrador,
+// Super Visor y quien tenga acceso al Plan estratégico, como en el SGC
+router.get('/tablero', authorizePEI, ctrl.getTablero);
 
 // Edición del catálogo (solo administradores)
 const admin = authorize('admin');

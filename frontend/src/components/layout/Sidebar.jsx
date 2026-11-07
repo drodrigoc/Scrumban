@@ -27,6 +27,9 @@ export default function Sidebar({ open, onClose }) {
   const isAdminVisible = user?.role === 'admin';
   const isSuperViewer  = user?.role === 'superViewer';
   const hasSGCAccess   = !!user?.sgc_access && !isAdminVisible && !isSuperViewer;
+  // Plan estratégico: igual que el SGC, en Administración para el
+  // administrador y en Supervisión para el Super Visor o quien tenga acceso
+  const hasPEIAccess   = !!user?.pei_access && !isAdminVisible && !isSuperViewer;
 
   const linkClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -76,10 +79,6 @@ export default function Sidebar({ open, onClose }) {
                 <UsersRound className="w-4 h-4 flex-shrink-0" />
                 Seguimiento de Equipo
               </NavLink>
-              <NavLink to="/plan-estrategico" className={linkClass}>
-                <Target className="w-4 h-4 flex-shrink-0" />
-                Plan estratégico
-              </NavLink>
             </>
           )}
 
@@ -100,6 +99,10 @@ export default function Sidebar({ open, onClose }) {
                 <ShieldCheck className="w-4 h-4 flex-shrink-0" />
                 SGC
               </NavLink>
+              <NavLink to="/plan-estrategico" className={linkClass}>
+                <Target className="w-4 h-4 flex-shrink-0" />
+                Plan estratégico
+              </NavLink>
               <NavLink to="/poa" className={linkClass}>
                 <Lock className="w-4 h-4 flex-shrink-0" />
                 Control del POA
@@ -115,15 +118,23 @@ export default function Sidebar({ open, onClose }) {
             </>
           )}
 
-          {(isSuperViewer || hasSGCAccess) && (
+          {(isSuperViewer || hasSGCAccess || hasPEIAccess) && (
             <>
               <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2 mt-4">
                 Supervisión
               </p>
-              <NavLink to="/sgc" className={linkClass}>
-                <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                SGC
-              </NavLink>
+              {(isSuperViewer || hasSGCAccess) && (
+                <NavLink to="/sgc" className={linkClass}>
+                  <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                  SGC
+                </NavLink>
+              )}
+              {(isSuperViewer || hasPEIAccess) && (
+                <NavLink to="/plan-estrategico" className={linkClass}>
+                  <Target className="w-4 h-4 flex-shrink-0" />
+                  Plan estratégico
+                </NavLink>
+              )}
             </>
           )}
         </nav>

@@ -27,7 +27,7 @@ import PlanEstrategico from './pages/PlanEstrategico';
 import ControlPOA from './pages/ControlPOA';
 import NotFound from './pages/NotFound';
 
-function PrivateRoute({ children, roles, allowSGC }) {
+function PrivateRoute({ children, roles, allowSGC, allowPEI }) {
   const { user, loading } = useAuth();
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -38,7 +38,8 @@ function PrivateRoute({ children, roles, allowSGC }) {
   if (roles) {
     const hasRole = roles.includes(user.role);
     const hasSGC  = allowSGC && !!user.sgc_access;
-    if (!hasRole && !hasSGC) return <Navigate to="/" replace />;
+    const hasPEI  = allowPEI && !!user.pei_access;
+    if (!hasRole && !hasSGC && !hasPEI) return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -66,7 +67,7 @@ function AppRoutes() {
           </PrivateRoute>
         } />
         <Route path="plan-estrategico" element={
-          <PrivateRoute roles={['admin', 'coordinator', 'superViewer']}>
+          <PrivateRoute roles={['admin', 'superViewer']} allowPEI>
             <PlanEstrategico />
           </PrivateRoute>
         } />
