@@ -154,13 +154,13 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
           <Paperclip className="w-4 h-4 text-gray-400 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{a.filename}</p>
-            <p className="text-xs text-gray-400">Por {a.uploaded_by_name}</p>
+            <p className="text-xs text-gray-400 truncate">Por {a.uploaded_by_name}</p>
           </div>
           <EnlaceDescarga
             adjunto={a}
             projectId={projectId}
             taskId={task.id}
-            className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+            className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0 px-2 py-2.5 sm:px-0 sm:py-0"
           />
           {!readOnly && (
             <button
@@ -174,9 +174,10 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
                   toast.error(err.response?.data?.message || 'Error al eliminar archivo');
                 }
               }}
-              className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
+              aria-label="Eliminar archivo"
+              className="p-2.5 sm:p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           )}
         </div>
@@ -186,7 +187,7 @@ function AttachmentsTab({ task, projectId, readOnly, attachments, setAttachments
       )}
 
       {!readOnly && !subida && (
-        <label className="flex items-center gap-2 p-3 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50/30 dark:hover:bg-primary-900/10 transition-colors">
+        <label className="flex items-center gap-2 p-4 sm:p-3 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-primary-300 dark:hover:border-primary-600 hover:bg-primary-50/30 dark:hover:bg-primary-900/10 transition-colors">
           <Paperclip className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-500 dark:text-gray-400">Adjuntar archivo</span>
           <input
@@ -523,15 +524,15 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
   ];
 
   return (
-    <div className="flex flex-col gap-0 min-h-[520px]">
+    <div className="flex flex-col gap-0 sm:min-h-[520px]">
       {/* Tabs */}
       {task?.id && (
-        <div className="flex border-b border-gray-100 dark:border-gray-700 -mx-5 px-5 mb-4 gap-1 overflow-x-auto">
+        <div className="flex border-b border-gray-100 dark:border-gray-700 -mx-4 px-4 sm:-mx-5 sm:px-5 mb-4 gap-1 overflow-x-auto overscroll-x-contain flex-shrink-0">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`pb-2 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              className={`pb-2.5 pt-1 px-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === t.id
                   ? 'border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -560,7 +561,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               onChange={e => setForm({ ...form, description: e.target.value })} rows={3} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label flex items-center gap-1"><User className="w-3.5 h-3.5" /> Responsable</label>
               <CampoSelector
@@ -578,7 +579,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Fecha inicio</label>
               <input type="date" className="input" value={form.start_date}
@@ -591,7 +592,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Estado</label>
               <select className="input" value={form.status}
@@ -604,7 +605,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               <input
                 type="range" min="0" max="100" step="5" value={form.progress}
                 onChange={e => setForm({ ...form, progress: parseInt(e.target.value) })}
-                className="w-full mt-2 accent-primary-600"
+                className="w-full mt-2 h-8 sm:h-auto accent-primary-600"
               />
             </div>
           </div>
@@ -625,7 +626,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             </div>
           )}
 
-          <div className={presupuesto ? 'grid grid-cols-2 gap-3' : ''}>
+          <div className={presupuesto ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''}>
           <div>
             <label className="label flex items-center gap-1">
               <span className="text-gray-400 text-sm font-medium">$</span> Costo (USD)
@@ -682,7 +683,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               <button
                 type="button"
                 onClick={() => { setShowLabelForm(v => !v); setTimeout(() => labelNameRef.current?.focus(), 50); }}
-                className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+                className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 px-2 py-2 sm:p-0 -my-2 sm:my-0"
               >
                 <Plus className="w-3 h-3" /> Nueva
               </button>
@@ -702,23 +703,23 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">Color:</span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2 sm:gap-1.5">
                     {PRESET_COLORS.map(c => (
                       <button
                         key={c} type="button"
                         onClick={() => setNewLabelColor(c)}
-                        className={`w-5 h-5 rounded-full transition-transform ${newLabelColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-110'}`}
+                        className={`w-7 h-7 sm:w-5 sm:h-5 rounded-full transition-transform ${newLabelColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-110'}`}
                         style={{ backgroundColor: c }}
                       />
                     ))}
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button type="button" className="btn-secondary text-xs py-1 flex-1"
+                  <button type="button" className="btn-secondary text-xs py-2 sm:py-1 flex-1"
                     onClick={() => { setShowLabelForm(false); setNewLabelName(''); }}>
                     Cancelar
                   </button>
-                  <button type="button" className="btn-primary text-xs py-1 flex-1"
+                  <button type="button" className="btn-primary text-xs py-2 sm:py-1 flex-1"
                     disabled={savingLabel || !newLabelName.trim()}
                     onClick={handleCreateLabel}>
                     {savingLabel
@@ -740,7 +741,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 {localLabels.map(l => (
                   <button
                     key={l.id} type="button" onClick={() => toggleLabel(l.id)}
-                    className={`text-xs px-2.5 py-1 rounded-full border transition-all font-medium ${
+                    className={`text-xs px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-full border transition-all font-medium ${
                       form.label_ids.includes(l.id)
                         ? 'border-transparent'
                         : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'
@@ -759,18 +760,19 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
 
           </fieldset>
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
             {readOnly ? (
-              <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cerrar</button>
+              <button type="button" className="btn-secondary flex-1 py-3 sm:py-2" onClick={onCancel}>Cerrar</button>
             ) : (
               <>
-                <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
+                <button type="button" className="btn-secondary flex-1 py-3 sm:py-2 order-2 sm:order-none" onClick={onCancel}>Cancelar</button>
                 {onDelete && (
-                  <button type="button" className="btn-danger px-3" onClick={onDelete}>
+                  <button type="button" className="btn-danger sm:px-3 py-3 sm:py-2 order-3 sm:order-none mt-4 sm:mt-0 flex items-center justify-center gap-2" onClick={onDelete} aria-label="Eliminar tarea">
                     <Trash2 className="w-4 h-4" />
+                    <span className="sm:hidden">Eliminar tarea</span>
                   </button>
                 )}
-                <button type="submit" disabled={saving} className="btn-primary flex-1">
+                <button type="submit" disabled={saving} className="btn-primary flex-1 py-3 sm:py-2 order-1 sm:order-none">
                   {saving
                     ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : 'Guardar'
@@ -813,7 +815,8 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                       <button
                         type="button"
                         onClick={() => toggleSgc(e.id)}
-                        className="ml-0.5 hover:text-primary-900 dark:hover:text-primary-100 flex-shrink-0"
+                        className="ml-0.5 p-1.5 -m-1 sm:p-0 sm:m-0 hover:text-primary-900 dark:hover:text-primary-100 flex-shrink-0"
+                        aria-label="Desvincular"
                         title="Desvincular"
                       >
                         <X className="w-3 h-3" />
@@ -846,7 +849,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => setSgcSearch('')}
-                className="absolute right-2 top-1/2 translate-y-0.5 text-gray-400 hover:text-gray-600"
+                className="absolute right-1 sm:right-2 top-1/2 translate-y-0.5 p-2 sm:p-0 text-gray-400 hover:text-gray-600"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -899,7 +902,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               <p className="text-sm text-gray-400 dark:text-gray-500">Sin archivos adjuntos</p>
             )}
             {sgcAttachments.map(a => (
-              <div key={a.id} className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-900/40">
+              <div key={a.id} className="flex items-center gap-1 sm:gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-900/40">
                 <Paperclip className="w-4 h-4 text-green-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{a.filename}</p>
@@ -912,7 +915,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                         value={a.evidencia_id || ''}
                         onChange={e => reasignarEvidencia(a, parseInt(e.target.value, 10))}
                         title="Evidencia a la que pertenece este archivo"
-                        className="font-mono font-semibold text-green-700 dark:text-green-400
+                        className="font-mono font-semibold text-green-700 dark:text-green-400 max-w-[10rem] py-1.5 sm:py-0.5
                                    bg-transparent border border-transparent hover:border-green-300
                                    dark:hover:border-green-700 rounded px-1 py-0.5 cursor-pointer
                                    focus:outline-none focus:border-green-400"
@@ -937,7 +940,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                   adjunto={a}
                   projectId={projectId}
                   taskId={task.id}
-                  className="text-xs text-green-600 dark:text-green-400 hover:underline flex-shrink-0"
+                  className="text-xs text-green-600 dark:text-green-400 hover:underline flex-shrink-0 px-2 py-2.5 sm:px-0 sm:py-0"
                 />
                 {!readOnly && (
                   <button
@@ -951,9 +954,10 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                         toast.error(err.response?.data?.message || 'Error al eliminar archivo');
                       }
                     }}
-                    className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
+                    aria-label="Eliminar archivo"
+                    className="p-2.5 sm:p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </button>
                 )}
               </div>
@@ -981,7 +985,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             )}
 
             {!readOnly && !subidaSgc && sgcLinkedIds.length > 0 && (
-              <label className="flex items-center gap-2 p-2.5 border-2 border-dashed border-green-200 dark:border-green-800 rounded-lg cursor-pointer hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-900/10 transition-colors">
+              <label className="flex items-center gap-2 p-4 sm:p-2.5 border-2 border-dashed border-green-200 dark:border-green-800 rounded-lg cursor-pointer hover:border-green-400 dark:hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-900/10 transition-colors">
                 <Paperclip className="w-4 h-4 text-green-400" />
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Adjuntar archivo de evidencia
@@ -1049,7 +1053,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
           )}
 
           {/* Items */}
-          <div className="space-y-1 max-h-64 overflow-y-auto">
+          <div className="space-y-1 max-h-64 overflow-y-auto overscroll-contain">
             {loadingChecklist ? (
               <div className="flex justify-center py-6">
                 <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -1059,18 +1063,22 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 Sin ítems aún. Agrega el primero abajo.
               </p>
             ) : checklist?.map(item => (
-              <div key={item.id} className="flex items-center gap-2 group py-1 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
+              <div key={item.id} className="flex items-center gap-1 sm:gap-2 group py-0.5 sm:py-1 px-1 sm:px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800">
                 <button
+                  type="button"
                   onClick={() => handleToggleItem(item)}
-                  className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                  aria-label={item.is_completed ? 'Marcar como pendiente' : 'Marcar como completado'}
+                  className="flex-shrink-0 p-2.5 -m-0.5 sm:p-0 sm:m-0 flex items-center justify-center"
+                >
+                  <span className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                     item.is_completed
                       ? 'bg-green-500 border-green-500 text-white'
                       : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'
-                  }`}
-                >
-                  {item.is_completed && <Check className="w-3 h-3" />}
+                  }`}>
+                    {item.is_completed && <Check className="w-3 h-3" />}
+                  </span>
                 </button>
-                <span className={`flex-1 text-sm ${
+                <span className={`flex-1 min-w-0 break-words text-sm py-1.5 sm:py-0 ${
                   item.is_completed
                     ? 'line-through text-gray-400 dark:text-gray-500'
                     : 'text-gray-700 dark:text-gray-300'
@@ -1078,10 +1086,12 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                   {item.text}
                 </span>
                 <button
+                  type="button"
                   onClick={() => handleDeleteItem(item.id)}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-all"
+                  aria-label="Eliminar ítem"
+                  className="opacity-0 group-hover:opacity-100 p-2.5 sm:p-0.5 rounded text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-all flex-shrink-0"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                 </button>
               </div>
             ))}
@@ -1100,7 +1110,8 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
             <button
               onClick={handleAddItem}
               disabled={addingItem || !newItemText.trim()}
-              className="btn-primary px-3"
+              aria-label="Agregar ítem"
+              className="btn-primary px-4 sm:px-3 flex-shrink-0"
             >
               {addingItem
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1114,7 +1125,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
       {/* ── COMMENTS ── */}
       {activeTab === 'comments' && task?.id && (
         <div className="space-y-4">
-          <div className="space-y-3 max-h-60 overflow-y-auto">
+          <div className="space-y-3 max-h-60 overflow-y-auto overscroll-contain">
             {!task.comments?.length ? (
               <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">Sin comentarios aún</p>
             ) : task.comments.map(c => (
@@ -1122,9 +1133,9 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 <div className="w-7 h-7 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-xs flex-shrink-0">
                   {c.user_name?.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2">
+                <div className="flex-1 min-w-0 bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2">
                   <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{c.user_name}</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">{c.content}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5 break-words">{c.content}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     {format(new Date(c.created_at), 'dd MMM yyyy, HH:mm', { locale: es })}
                   </p>
@@ -1140,7 +1151,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
                 value={comment} onChange={e => setComment(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleComment()}
               />
-              <button onClick={handleComment} disabled={submittingComment || !comment.trim()} className="btn-primary px-3">
+              <button onClick={handleComment} disabled={submittingComment || !comment.trim()} aria-label="Enviar comentario" className="btn-primary px-4 sm:px-3 flex-shrink-0">
                 <Send className="w-4 h-4" />
               </button>
             </div>
@@ -1150,7 +1161,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
 
       {/* ── HISTORY ── */}
       {activeTab === 'history' && task?.id && (
-        <div className="space-y-2 max-h-80 overflow-y-auto">
+        <div className="space-y-2 max-h-80 overflow-y-auto overscroll-contain">
           {!task.history?.length ? (
             <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-4">Sin historial</p>
           ) : task.history.map(h => (
@@ -1158,7 +1169,7 @@ export default function TaskModal({ task, projectId, members, labels: initialLab
               <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-400 font-semibold text-xs flex-shrink-0 mt-0.5">
                 {h.user_name?.charAt(0)}
               </div>
-              <div>
+              <div className="min-w-0 break-words">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   <span className="font-medium">{h.user_name}</span>
                   {' '}{h.field_changed === 'created' ? 'creó la tarea' : `cambió ${historyFieldLabels[h.field_changed] || h.field_changed}`}

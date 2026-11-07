@@ -1,4 +1,4 @@
-import { Calendar, AlertTriangle, MessageCircle, Archive } from 'lucide-react';
+import { Calendar, AlertTriangle, MessageCircle, Archive, ArrowRightLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { diaLocal, diasParaVencer, estaVencida } from '../../utils/fechas';
 import { es } from 'date-fns/locale';
@@ -10,7 +10,16 @@ const priorityLabel = {
   low: 'Baja', medium: 'Media', high: 'Alta', critical: 'Crítica',
 };
 
-export default function TaskCard({ task, onClick, onArchive }) {
+// Los sensores de dnd-kit escuchan mouse/touch/pointer: un botón dentro de la
+// tarjeta debe frenar los tres para no iniciar un arrastre.
+const stopDrag = e => e.stopPropagation();
+const noDragProps = {
+  onPointerDown: stopDrag,
+  onMouseDown: stopDrag,
+  onTouchStart: stopDrag,
+};
+
+export default function TaskCard({ task, onClick, onArchive, onMove }) {
   const isOverdue = task.due_date && task.status !== 'completed' && estaVencida(task.due_date);
   const daysLeft = task.due_date ? diasParaVencer(task.due_date) : null;
   const isDueSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && task.status !== 'completed';
@@ -34,13 +43,14 @@ export default function TaskCard({ task, onClick, onArchive }) {
         <button
           type="button"
           title="Archivar tarea"
-          onPointerDown={e => e.stopPropagation()}
+          aria-label="Archivar tarea"
+          {...noDragProps}
           onClick={e => { e.stopPropagation(); onArchive(); }}
-          className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover/card:opacity-100
+          className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 p-2 sm:p-1 rounded-md opacity-0 group-hover/card:opacity-100
                      text-gray-400 hover:text-primary-600 dark:hover:text-primary-400
                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
         >
-          <Archive className="w-3.5 h-3.5" />
+          <Archive className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
         </button>
       )}
 
@@ -50,7 +60,7 @@ export default function TaskCard({ task, onClick, onArchive }) {
           {task.labels.map(l => (
             <span
               key={l.id}
-              className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+              className="text-xs px-1.5 py-0.5 rounded-full font-medium max-w-full truncate"
               style={{ backgroundColor: l.color + '25', color: l.color }}
             >
               {l.name}
@@ -60,7 +70,7 @@ export default function TaskCard({ task, onClick, onArchive }) {
       )}
 
       {/* Title */}
-      <p className={`text-sm font-medium leading-tight mb-2 ${
+      <p className={`text-sm font-medium leading-tight mb-2 break-words ${onArchive ? 'pr-8 sm:pr-0' : ''} ${
         isOverdue ? 'text-red-800 dark:text-red-300' : 'text-gray-800 dark:text-gray-100'
       }`}>
         {task.title}
@@ -113,6 +123,22 @@ export default function TaskCard({ task, onClick, onArchive }) {
           )}
         </div>
       </div>
+
+      {/* Mover a otro estado — solo móvil */}
+      {onMove && (
+        <button
+          type="button"
+          aria-label={`Mover tarea ${task.title}`}
+          {...noDragProps}
+          onClick={e => { e.stopPropagation(); onMove(); }}
+          className="sm:hidden mt-2 w-full flex items-center justify-center gap-1.5 min-h-10 rounded-lg border
+                     border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50
+                     text-xs font-medium text-gray-600 dark:text-gray-300
+                     active:bg-gray-100 dark:active:bg-gray-700"
+        >
+          <ArrowRightLeft className="w-3.5 h-3.5" /> Mover
+        </button>
+      )}
     </div>
   );
 }

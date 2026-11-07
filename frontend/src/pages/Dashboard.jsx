@@ -6,15 +6,15 @@ import { FolderKanban, CheckSquare, AlertTriangle, Clock, TrendingUp, Users, Bar
 
 function StatCard({ icon: Icon, label, value, color, sub }) {
   return (
-    <div className="card p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-1">{value}</p>
-          {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{sub}</p>}
+    <div className="card p-3 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{label}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mt-0.5 sm:mt-1">{value}</p>
+          {sub && <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 mt-0.5 sm:mt-1 truncate">{sub}</p>}
         </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-          <Icon className="w-5 h-5 text-white" />
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         </div>
       </div>
     </div>
@@ -49,45 +49,45 @@ export default function Dashboard() {
   if (!data) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
           ¡Bienvenido, {user?.name?.split(' ')[0]}! 👋
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Aquí está el resumen de tu trabajo</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard icon={FolderKanban} label="Proyectos Activos" value={data.projects.active} color="bg-primary-500" sub={`${data.projects.total} en total`} />
         <StatCard icon={CheckSquare} label="Tareas Completadas" value={data.tasks.completed} color="bg-green-500" sub={`${data.tasks.total} en total`} />
         <StatCard icon={AlertTriangle} label="Tareas Vencidas" value={data.tasks.overdue} color="bg-red-500" sub="Requieren atención" />
         <StatCard icon={Clock} label="Vencen en 7 días" value={data.tasks.due_soon} color="bg-amber-500" sub="Próximas a vencer" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Progreso de proyectos */}
-        <div className="lg:col-span-2 card p-5">
+        <div className="lg:col-span-2 card p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-primary-500" />
               Avance por Proyecto
             </h2>
-            <Link to="/projects" className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700">Ver todos →</Link>
+            <Link to="/projects" className="text-xs flex-shrink-0 ml-2 py-2 sm:py-0 text-primary-600 dark:text-primary-400 hover:text-primary-700">Ver todos →</Link>
           </div>
           <div className="space-y-4">
             {data.projectsProgress.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">No hay proyectos activos</p>
             ) : data.projectsProgress.map(p => (
               <div key={p.id}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
-                    <Link to={`/projects/${p.id}`} className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                    <Link to={`/projects/${p.id}`} className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 truncate py-1 sm:py-0">
                       {p.name}
                     </Link>
                   </div>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{p.progress}%</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex-shrink-0">{p.progress}%</span>
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
                   <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${p.progress}%`, backgroundColor: p.color }} />
@@ -99,7 +99,7 @@ export default function Dashboard() {
         </div>
 
         {/* Estado de tareas */}
-        <div className="card p-5">
+        <div className="card p-4 sm:p-5">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-4">
             <TrendingUp className="w-4 h-4 text-primary-500" />
             Estado de Tareas
@@ -125,9 +125,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Carga de trabajo */}
-        <div className="card p-5">
+        <div className="card p-4 sm:p-5">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-4">
             <Users className="w-4 h-4 text-primary-500" />
             Carga de Trabajo
@@ -156,7 +156,7 @@ export default function Dashboard() {
         </div>
 
         {/* Actividad reciente */}
-        <div className="card p-5">
+        <div className="card p-4 sm:p-5">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-4">
             <Activity className="w-4 h-4 text-primary-500" />
             Actividad Reciente

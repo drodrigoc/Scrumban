@@ -240,7 +240,7 @@ export default function EmailSettings() {
             </p>
           )}
           <div className="flex justify-end">
-            <button onClick={guardar} disabled={!!ocupado} className="btn-primary text-sm">Guardar</button>
+            <button onClick={guardar} disabled={!!ocupado} className="btn-primary text-sm w-full sm:w-auto justify-center">Guardar</button>
           </div>
         </div>
       )}
@@ -250,9 +250,9 @@ export default function EmailSettings() {
         <div className="card p-5 space-y-3">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Enviar un correo de prueba</h2>
           <div className="flex gap-2 flex-wrap">
-            <input className="input flex-1 min-w-56" type="email" value={destinoPrueba}
+            <input className="input flex-1 min-w-0 w-full sm:w-auto sm:min-w-56" type="email" value={destinoPrueba}
               onChange={e => setDestinoPrueba(e.target.value)} />
-            <button onClick={probar} disabled={!!ocupado || !destinoPrueba} className="btn-secondary text-sm">
+            <button onClick={probar} disabled={!!ocupado || !destinoPrueba} className="btn-secondary text-sm w-full sm:w-auto justify-center">
               {ocupado === 'probar'
                 ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 : <Send className="w-4 h-4" />}
@@ -272,7 +272,7 @@ export default function EmailSettings() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <Indicador icono={Clock}        valor={estado.cola.pendientes}   etiqueta="En cola" />
           <Indicador icono={CheckCircle2} valor={estado.cola.enviados_24h} etiqueta="Enviados (24 h)" />
           <Indicador icono={XCircle}      valor={estado.cola.fallidos_7d}  etiqueta="Fallidos (7 días)" alerta={estado.cola.fallidos_7d > 0} />
@@ -331,7 +331,7 @@ function Requisito({ ok, texto }) {
 
 function Indicador({ icono: Icono, valor, etiqueta, alerta }) {
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 sm:p-3 text-center min-w-0">
       <Icono className={`w-4 h-4 mx-auto mb-1 ${alerta ? 'text-red-500' : 'text-gray-400'}`} />
       <p className={`text-xl font-bold tabular-nums ${alerta ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>{valor}</p>
       <p className="text-xs text-gray-500 dark:text-gray-400">{etiqueta}</p>

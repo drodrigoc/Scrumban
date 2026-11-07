@@ -275,14 +275,14 @@ export default function ReporteTab() {
           <option value="">Todos los indicadores</option>
           {indicadores.map(([c, n]) => <option key={c} value={c}>{c} — {n}</option>)}
         </select>
-        <div className="flex gap-2 sm:ml-auto">
-          <button onClick={descargarExcel} disabled={descargando || !evidencias.length} className="btn-secondary text-sm py-1.5">
+        <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+          <button onClick={descargarExcel} disabled={descargando || !evidencias.length} className="btn-secondary text-sm py-2 sm:py-1.5 flex-1 sm:flex-none justify-center">
             {descargando
               ? <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
               : <FileSpreadsheet className="w-4 h-4" />}
             Excel
           </button>
-          <button onClick={imprimir} disabled={!evidencias.length} className="btn-primary text-sm py-1.5">
+          <button onClick={imprimir} disabled={!evidencias.length} className="btn-primary text-sm py-2 sm:py-1.5 flex-1 sm:flex-none justify-center">
             <Printer className="w-4 h-4" /> Imprimir o PDF
           </button>
         </div>
@@ -306,7 +306,7 @@ export default function ReporteTab() {
         </div>
       ) : (
         <div className="card overflow-x-auto">
-          <table className="w-full text-sm text-gray-700 dark:text-gray-300">
+          <table className="w-full text-sm text-gray-700 dark:text-gray-300 min-w-[480px]">
             <thead className="text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Código</th>
@@ -324,7 +324,7 @@ export default function ReporteTab() {
                 return [
                   <tr key={kd} className="bg-gray-50/80 dark:bg-gray-800/50 font-semibold text-gray-900 dark:text-gray-100">
                     <td className="px-3 py-2 whitespace-nowrap">
-                      <button type="button" onClick={() => alternar(kd)} className="inline-flex items-center gap-1 font-mono text-xs"
+                      <button type="button" onClick={() => alternar(kd)} className="inline-flex items-center gap-1 font-mono text-xs py-1.5 sm:py-0"
                         aria-expanded={abierta} aria-label={`${abierta ? 'Contraer' : 'Expandir'} dimensión ${d.codigo}`}>
                         {abierta ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                         {d.codigo}

@@ -30,13 +30,13 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-600 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6 sm:mb-8">
           <img src={logo} alt="USO Projects" className="h-16 w-auto object-contain mb-3 drop-shadow-lg" />
           <p className="text-primary-200 text-sm mt-1">Sistema de Gestión de Proyectos</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 border border-transparent dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-5 sm:p-8 border border-transparent dark:border-gray-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">Iniciar sesión</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Ingresa tus credenciales para continuar</p>
 
@@ -54,20 +54,21 @@ export default function Login() {
               <label className="label">Contraseña</label>
               <div className="relative">
                 <input
-                  type={showPass ? 'text' : 'password'} className="input pr-10"
+                  type={showPass ? 'text' : 'password'} className="input pr-12 sm:pr-10"
                   placeholder="••••••••"
                   value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                   required autoComplete="current-password"
                 />
                 <button type="button" onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 p-2.5 sm:p-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             <div className="flex justify-end">
-              <Link to="/forgot-password" className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700">
+              <Link to="/forgot-password" className="text-sm py-1.5 sm:py-0 text-primary-600 dark:text-primary-400 hover:text-primary-700">
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>

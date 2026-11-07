@@ -88,15 +88,15 @@ export default function Projects() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Proyectos</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Proyectos</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {projects.length} {verArchivados ? 'archivados' : 'proyectos activos'}
           </p>
         </div>
         {!verArchivados && (user?.role === 'admin' || user?.role === 'coordinator') && (
-          <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary">
+          <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" /> Nuevo Proyecto
           </button>
         )}
@@ -107,7 +107,7 @@ export default function Projects() {
           <button
             key={t.label}
             onClick={() => { setVerArchivados(t.id); setOpenMenu(null); }}
-            className={`pb-2.5 px-4 text-sm font-medium border-b-2 transition-colors ${
+            className={`pb-2.5 pt-2 sm:pt-0 px-4 text-sm font-medium border-b-2 transition-colors ${
               verArchivados === t.id
                 ? 'border-primary-600 text-primary-600 dark:text-primary-400 dark:border-primary-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
@@ -119,11 +119,11 @@ export default function Projects() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
+        <div className="relative w-full sm:w-auto flex-1 sm:min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input type="text" placeholder="Buscar proyectos..." value={search} onChange={e => setSearch(e.target.value)} className="input pl-9" />
         </div>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-auto">
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-full sm:w-auto">
           <option value="all">Todos los estados</option>
           <option value="active">Activo</option>
           <option value="paused">Pausado</option>
@@ -148,7 +148,7 @@ export default function Projects() {
             const st = statusConfig[p.status] || statusConfig.active;
             const progress = p.progress ?? 0;
             return (
-              <div key={p.id} className="card p-5 hover:shadow-md dark:hover:shadow-gray-900/50 transition-shadow group relative">
+              <div key={p.id} className="card p-4 sm:p-5 hover:shadow-md dark:hover:shadow-gray-900/50 transition-shadow group relative">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
@@ -166,17 +166,17 @@ export default function Projects() {
                       <div className="relative">
                         <button
                           onClick={e => { e.stopPropagation(); e.preventDefault(); setOpenMenu(openMenu === p.id ? null : p.id); }}
-                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                          className="p-2.5 -m-1.5 sm:p-1 sm:m-0 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                           aria-label="Opciones del proyecto" aria-expanded={openMenu === p.id}
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         {openMenu === p.id && (
-                          <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 z-20 py-1">
+                          <div className="absolute right-0 top-full mt-1 w-44 sm:w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-gray-900/50 z-20 py-1">
                             {p.puede_editar && (
                               <button
                                 onClick={() => { setEditing(p); setShowModal(true); setOpenMenu(null); }}
-                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                className="flex items-center gap-2 w-full px-3 py-3 sm:py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                               >
                                 <Edit className="w-3.5 h-3.5" /> Editar
                               </button>
@@ -184,7 +184,7 @@ export default function Projects() {
                             {p.puede_archivar && !p.archived_at && (
                               <button
                                 onClick={() => { setOpenMenu(null); archivo.archivar(p); }}
-                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                className="flex items-center gap-2 w-full px-3 py-3 sm:py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                               >
                                 <Archive className="w-3.5 h-3.5" /> Archivar
                               </button>
@@ -192,7 +192,7 @@ export default function Projects() {
                             {p.puede_archivar && p.archived_at && (
                               <button
                                 onClick={() => { setOpenMenu(null); archivo.restaurar(p); }}
-                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                className="flex items-center gap-2 w-full px-3 py-3 sm:py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                               >
                                 <ArchiveRestore className="w-3.5 h-3.5" /> Restaurar
                               </button>
@@ -200,7 +200,7 @@ export default function Projects() {
                             {p.puede_eliminar && (
                               <button
                                 onClick={() => { setOpenMenu(null); archivo.eliminar(p); }}
-                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                className="flex items-center gap-2 w-full px-3 py-3 sm:py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> Eliminar
                               </button>

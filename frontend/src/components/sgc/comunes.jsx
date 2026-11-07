@@ -50,7 +50,7 @@ export function BotonDescarga({ archivo, projectId, taskId, className = '' }) {
     <button
       type="button" onClick={descargar} disabled={descargando}
       title={`Descargar ${archivo.filename}`} aria-label={`Descargar ${archivo.filename}`}
-      className={`p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-primary-400 disabled:opacity-60 ${className}`}
+      className={`p-2.5 sm:p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-primary-400 disabled:opacity-60 ${className}`}
     >
       {descargando
         ? <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
@@ -146,11 +146,12 @@ export function BarraEstados({ conteo, alto = 'h-2.5' }) {
             className={`${ESTADOS[e].barra} h-full transition-opacity ${activo && activo !== e ? 'opacity-50' : ''}`}
             style={{ width: `${(conteo[e] / conteo.total) * 100}%`, minWidth: '3px' }}
             onMouseEnter={() => setActivo(e)}
+            onClick={() => setActivo(a => (a === e ? null : e))}
           />
         ))}
       </div>
       {activo && (
-        <div className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1 px-2.5 py-1.5 rounded-lg shadow-lg bg-gray-900 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none">
+        <div className="absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-1 px-2.5 py-1.5 rounded-lg shadow-lg bg-gray-900 dark:bg-gray-700 text-white text-xs whitespace-nowrap pointer-events-none max-w-[calc(100vw-2rem)]">
           <span className={`inline-block w-2 h-2 rounded-sm mr-1.5 ${ESTADOS[activo].barra}`} />
           {ESTADOS[activo].label}: <b>{conteo[activo]}</b> de {conteo.total} ({porcentaje(conteo[activo], conteo.total)}%)
         </div>

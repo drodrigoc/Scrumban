@@ -151,25 +151,25 @@ export default function ProjectDetail() {
   };
 
   const views = [
-    { to: `/projects/${id}/backlog`,   icon: List,             label: 'Backlog' },
-    { to: `/projects/${id}/kanban`,    icon: Kanban,           label: 'Tablero Kanban' },
-    { to: `/projects/${id}/calendar`,  icon: CalendarDays,     label: 'Calendario' },
-    { to: `/projects/${id}/gantt`,     icon: GanttChartSquare, label: 'Cronograma' },
-    { to: `/projects/${id}/archive`,   icon: Archive,          label: 'Archivo' },
+    { to: `/projects/${id}/backlog`,   icon: List,             label: 'Backlog',        corto: 'Backlog' },
+    { to: `/projects/${id}/kanban`,    icon: Kanban,           label: 'Tablero Kanban', corto: 'Kanban' },
+    { to: `/projects/${id}/calendar`,  icon: CalendarDays,     label: 'Calendario',     corto: 'Calendario' },
+    { to: `/projects/${id}/gantt`,     icon: GanttChartSquare, label: 'Cronograma',     corto: 'Cronograma' },
+    { to: `/projects/${id}/archive`,   icon: Archive,          label: 'Archivo',        corto: 'Archivo' },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="flex items-start gap-3">
-          <Link to="/projects" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 mt-0.5">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+          <Link to="/projects" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 mt-0.5 flex-shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </Link>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: project.color }} />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{project.name}</h1>
+              <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 break-words min-w-0">{project.name}</h1>
               <span className={`badge ${st.color}`}>{st.label}</span>
               {/* El bloqueo se indica con un candado en la etiqueta, sin aviso
                   grande: el detalle aparece al pasar el mouse */}
@@ -197,20 +197,20 @@ export default function ProjectDetail() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {puedeBloquear && (bloqueado ? (
-            <button onClick={() => cambiarBloqueo(false)} className="btn-secondary"
+            <button onClick={() => cambiarBloqueo(false)} className="btn-secondary flex-1 sm:flex-none justify-center"
               title="Permite de nuevo cambiar la planificación de este proyecto POA">
               <Unlock className="w-4 h-4" /> Desbloquear planificación
             </button>
           ) : (
-            <button onClick={() => cambiarBloqueo(true)} className="btn-secondary"
+            <button onClick={() => cambiarBloqueo(true)} className="btn-secondary flex-1 sm:flex-none justify-center"
               title="Congela la planificación de este proyecto POA">
               <Lock className="w-4 h-4" /> Bloquear planificación
             </button>
           ))}
           {canEdit && (
-            <button onClick={() => setShowEditModal(true)} className="btn-secondary">
+            <button onClick={() => setShowEditModal(true)} className="btn-secondary flex-1 sm:flex-none justify-center">
               <Edit className="w-4 h-4" /> {canPlan ? 'Editar' : 'Cambiar estado'}
             </button>
           )}
@@ -233,8 +233,8 @@ export default function ProjectDetail() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card p-4 text-center">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="card p-3 sm:p-4 text-center">
           <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{progress}%</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">Progreso</p>
           <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 mt-2">
@@ -246,7 +246,7 @@ export default function ProjectDetail() {
           { label: 'Completadas', value: completedTasks },
           { label: 'Miembros', value: project.members?.length || 0 },
         ].map(s => (
-          <div key={s.label} className="card p-4 text-center">
+          <div key={s.label} className="card p-3 sm:p-4 text-center">
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{s.label}</p>
           </div>
@@ -255,7 +255,7 @@ export default function ProjectDetail() {
 
       {/* Objetivos del proyecto, numerados */}
       {separarObjetivos(project.objectives).length > 0 && (
-        <div className="card p-5">
+        <div className="card p-4 sm:p-5">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
             Objetivo{separarObjetivos(project.objectives).length === 1 ? '' : 's'} del proyecto
           </h2>
@@ -275,15 +275,16 @@ export default function ProjectDetail() {
       {/* Views */}
       <div>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Vistas</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {views.map(({ to, icon: Icon, label }) => (
+        <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+          {views.map(({ to, icon: Icon, label, corto }) => (
             <Link key={to} to={to}
-              className="card p-4 flex items-center gap-3 hover:shadow-md dark:hover:shadow-gray-900/50 hover:border-primary-200 dark:hover:border-primary-700 transition-all group">
-              <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/50 transition-colors">
+              className="card p-2.5 sm:p-4 flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-3 text-center sm:text-left hover:shadow-md dark:hover:shadow-gray-900/50 hover:border-primary-200 dark:hover:border-primary-700 transition-all group">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/50 transition-colors">
                 <Icon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
               </div>
-              <span className="font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary-700 dark:group-hover:text-primary-400">
-                {label}
+              <span className="text-xs sm:text-base font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary-700 dark:group-hover:text-primary-400">
+                <span className="sm:hidden">{corto}</span>
+                <span className="hidden sm:inline">{label}</span>
               </span>
             </Link>
           ))}
@@ -307,14 +308,14 @@ export default function ProjectDetail() {
       <BudgetPanel projectId={id} canEdit={canPlan} soloEjecucion={canEdit && !canPlan} />
 
       {/* Members */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+      <div className="card p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 min-w-0">
             <Users className="w-4 h-4 text-primary-500" />
             Miembros del Equipo ({project.members?.length || 0})
           </h2>
           {canEdit && (
-            <button onClick={() => setShowMembersModal(true)} className="btn-secondary text-xs py-1.5 px-3">
+            <button onClick={() => setShowMembersModal(true)} className="btn-secondary text-xs py-2 sm:py-1.5 px-3 flex-shrink-0">
               <Plus className="w-3.5 h-3.5" /> Agregar
             </button>
           )}
@@ -336,7 +337,7 @@ export default function ProjectDetail() {
                         defaultValue={m.project_role}
                         onChange={e => handleUpdateRole(m.id, e.target.value)}
                         onBlur={() => setEditingRoleId(null)}
-                        className="text-xs border border-primary-400 rounded px-1 py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none"
+                        className="text-xs border border-primary-400 rounded px-1.5 py-1.5 sm:px-1 sm:py-0.5 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none"
                       >
                         <option value="coordinator">Coordinador</option>
                         <option value="member">Miembro</option>
@@ -363,26 +364,26 @@ export default function ProjectDetail() {
                       onClick={() => handleCostosFijos(m)}
                       title={m.ver_costos_fijos ? 'Quitar acceso a los costos fijos' : 'Permitir ver los costos fijos'}
                       aria-pressed={Boolean(m.ver_costos_fijos)}
-                      className={`p-1 rounded transition-colors ${m.ver_costos_fijos
+                      className={`p-2.5 sm:p-1 rounded transition-colors ${m.ver_costos_fijos
                         ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30'
                         : 'text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400'}`}
                     >
-                      <Wallet className="w-3.5 h-3.5" />
+                      <Wallet className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                   )}
                   <button
                     onClick={() => setEditingRoleId(editingRoleId === m.id ? null : m.id)}
                     title="Cambiar rol"
-                    className="p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+                    className="p-2.5 sm:p-1 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
                   >
-                    <UserCog className="w-3.5 h-3.5" />
+                    <UserCog className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </button>
                   <button
                     onClick={() => handleRemoveMember(m.id)}
                     title="Eliminar miembro"
-                    className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                    className="p-2.5 sm:p-1 ml-1 sm:ml-0 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </button>
                 </div>
               )}
@@ -392,7 +393,7 @@ export default function ProjectDetail() {
       </div>
 
       {project.mi_acceso?.archivar && (
-        <div className="card p-5 border-red-200 dark:border-red-900/50">
+        <div className="card p-4 sm:p-5 border-red-200 dark:border-red-900/50">
           <h2 className="font-semibold text-red-600 dark:text-red-400 mb-1">Zona de peligro</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Archivar saca el proyecto de la lista y lo deja de solo lectura; se puede restaurar.
@@ -400,11 +401,11 @@ export default function ProjectDetail() {
           </p>
           <div className="flex flex-wrap gap-2">
             {!project.archived_at ? (
-              <button onClick={() => archivo.archivar(project)} className="btn-secondary text-sm">
+              <button onClick={() => archivo.archivar(project)} className="btn-secondary text-sm w-full sm:w-auto justify-center">
                 <Archive className="w-4 h-4" /> Archivar proyecto
               </button>
             ) : (
-              <button onClick={() => archivo.eliminar(project)} className="btn-danger text-sm">
+              <button onClick={() => archivo.eliminar(project)} className="btn-danger text-sm w-full sm:w-auto justify-center">
                 <Trash2 className="w-4 h-4" /> Eliminar proyecto
               </button>
             )}
@@ -530,9 +531,9 @@ function AddMemberForm({ allUsers, units, currentMembers, onAdd, onClose }) {
 
       {/* Actions */}
       <div className="flex gap-2 pt-2">
-        <button className="btn-secondary flex-1" onClick={onClose}>Cancelar</button>
+        <button className="btn-secondary flex-1 justify-center" onClick={onClose}>Cancelar</button>
         <button
-          className="btn-primary flex-1"
+          className="btn-primary flex-1 justify-center"
           disabled={!userId}
           onClick={handleSubmit}
         >

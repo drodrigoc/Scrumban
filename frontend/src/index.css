@@ -71,6 +71,29 @@
   }
 }
 
+/* ── Móvil ─────────────────────────────────────────────────────────────── */
+/* Márgenes seguros (muesca y barra de gestos) cuando la app está instalada */
+.pt-safe { padding-top: max(env(safe-area-inset-top), 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+/* Espacio para la barra inferior de navegación (h-16) */
+.pb-nav  { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+@media (min-width: 1024px) { .pb-nav { padding-bottom: 1.5rem; } }
+
+/* iOS amplía la página al enfocar campos de menos de 16 px */
+@media (max-width: 639px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  select, textarea { font-size: 16px; }
+}
+
+/* En pantallas táctiles no hay «hover»: las acciones que solo aparecían al
+   pasar el ratón se muestran siempre */
+@media (hover: none) {
+  .group .group-hover\:opacity-100 { opacity: 1; }
+}
+
+/* Sin resaltado gris al tocar y con desplazamiento suave en iOS */
+html { -webkit-tap-highlight-color: transparent; }
+
 /* Animaciones */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }

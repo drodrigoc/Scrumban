@@ -138,14 +138,14 @@ export default function Auditoria() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Auditoría</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Quién entra al sistema, quién falla al intentarlo y qué cambios importantes se hacen. Se conserva un año.
           </p>
         </div>
-        <button onClick={descargar} disabled={descargando || !datos?.total} className="btn-primary">
+        <button onClick={descargar} disabled={descargando || !datos?.total} className="btn-primary w-full sm:w-auto justify-center flex-shrink-0">
           {descargando
             ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             : <Download className="w-4 h-4" />}
@@ -173,15 +173,15 @@ export default function Auditoria() {
           </h2>
           <ul className="space-y-1">
             {datos.alertas.map(a => (
-              <li key={a.correo} className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-gray-700 dark:text-gray-300 min-w-0 truncate">
+              <li key={a.correo} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 text-sm">
+                <span className="text-gray-700 dark:text-gray-300 min-w-0 sm:truncate break-words">
                   <b className="font-medium">{a.nombre || a.correo}</b>
                   {a.nombre && <span className="text-gray-500 dark:text-gray-400"> · {a.correo}</span>}
                   <span className="text-gray-500 dark:text-gray-400"> · {a.intentos} intentos, el último a las {hora(a.ultimo)}</span>
                 </span>
                 <button
                   onClick={() => { setBusqueda(''); filtrar({ ...FILTROS_VACIOS, correo: a.correo }); }}
-                  className="text-xs font-medium text-amber-800 dark:text-amber-300 hover:underline flex-shrink-0"
+                  className="text-xs font-medium text-amber-800 dark:text-amber-300 hover:underline flex-shrink-0 self-start sm:self-auto py-1"
                 >
                   Ver intentos
                 </button>
@@ -223,18 +223,18 @@ export default function Auditoria() {
           <option value="exito">Solo éxitos</option>
           <option value="fallo">Solo fallos</option>
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          Desde
-          <input type="date" className="input text-sm py-1 w-36" value={filtros.desde}
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 w-full sm:w-auto">
+          <span className="w-12 sm:w-auto flex-shrink-0">Desde</span>
+          <input type="date" className="input text-sm py-1 flex-1 sm:flex-none sm:w-36 min-w-0" value={filtros.desde}
             max={filtros.hasta || undefined} onChange={e => cambiar('desde', e.target.value)} />
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          Hasta
-          <input type="date" className="input text-sm py-1 w-36" value={filtros.hasta}
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 w-full sm:w-auto">
+          <span className="w-12 sm:w-auto flex-shrink-0">Hasta</span>
+          <input type="date" className="input text-sm py-1 flex-1 sm:flex-none sm:w-36 min-w-0" value={filtros.hasta}
             min={filtros.desde || undefined} onChange={e => cambiar('hasta', e.target.value)} />
         </label>
         {filtros.correo && (
-          <span className="badge bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 flex items-center gap-1 py-1">
+          <span className="badge bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 flex items-center gap-1 py-1 max-w-full break-all">
             Correo: {filtros.correo}
             <button onClick={() => cambiar('correo', '')} aria-label="Quitar el filtro de correo">
               <X className="w-3 h-3" />
@@ -322,14 +322,14 @@ export default function Auditoria() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPagina(p => p - 1)} disabled={pagina <= 1 || loading}
-                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:pointer-events-none"
+                className="p-2.5 sm:p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:pointer-events-none"
                 aria-label="Página anterior"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setPagina(p => p + 1)} disabled={pagina >= paginas || loading}
-                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:pointer-events-none"
+                className="p-2.5 sm:p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:pointer-events-none"
                 aria-label="Página siguiente"
               >
                 <ChevronRight className="w-4 h-4" />

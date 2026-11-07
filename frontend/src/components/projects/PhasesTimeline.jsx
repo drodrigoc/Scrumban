@@ -193,14 +193,14 @@ export default function PhasesTimeline({
                     <button
                       onClick={() => onEdit?.(phase)}
                       title="Editar fase"
-                      className="p-0.5 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
+                      className="p-1.5 sm:p-0.5 text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => onDelete?.(phase)}
                       title="Eliminar fase"
-                      className="p-0.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
+                      className="p-1.5 sm:p-0.5 ml-1 sm:ml-0 text-gray-400 hover:text-red-500 dark:hover:text-red-400"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

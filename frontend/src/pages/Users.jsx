@@ -102,18 +102,18 @@ export default function Users() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Control de Accesos</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">{users.length} usuarios registrados</p>
         </div>
-        <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary">
+        <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4" /> Nuevo Usuario
         </button>
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-48">
+        <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text" placeholder="Buscar usuarios..."
@@ -121,20 +121,97 @@ export default function Users() {
             className="input pl-9"
           />
         </div>
-        <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="input w-auto">
+        <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className="input w-full sm:w-auto">
           <option value="all">Todos los roles</option>
           <option value="admin">Administrador</option>
           <option value="coordinator">Coordinador</option>
           <option value="member">Miembro</option>
           <option value="superViewer">Super Visor</option>
         </select>
-<select value={filterUnit} onChange={e => setFilterUnit(e.target.value)} className="input w-auto">
+<select value={filterUnit} onChange={e => setFilterUnit(e.target.value)} className="input w-full sm:w-auto">
           <option value="all">Todas las unidades</option>
           {unitNames.map(u => <option key={u} value={u}>{u}</option>)}
         </select>
       </div>
 
-      <div className="card overflow-hidden">
+      {/* Móvil: lista de tarjetas */}
+      <div className="sm:hidden space-y-3">
+        {filtered.length === 0 ? (
+          <div className="card p-6 text-center text-gray-400 dark:text-gray-500">No hay usuarios</div>
+        ) : filtered.map(u => {
+          const roleInfo = roleConfig[u.role] || roleConfig.member;
+          return (
+            <div key={u.id} className="card p-4 space-y-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-sm flex-shrink-0">
+                  {u.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{u.name}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{u.email}</p>
+                </div>
+                <span className={`badge flex-shrink-0 ${u.is_active
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                }`}>
+                  {u.is_active ? 'Activo' : 'Deshabilitado'}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className={`badge ${roleInfo.color}`}>{roleInfo.label}</span>
+                {!['admin', 'superViewer'].includes(u.role) && u.sgc_access && (
+                  <span className="badge bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">SGC</span>
+                )}
+                {!['admin', 'superViewer'].includes(u.role) && u.pei_access && (
+                  <span className="badge bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">Plan</span>
+                )}
+                {u.unit && (
+                  <span className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+                    <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" /><span className="truncate">{u.unit}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Último acceso: {u.last_login_at ? ultimoAcceso(u.last_login_at) : 'Nunca'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Link
+                    to={`/auditoria?usuario=${u.id}`}
+                    className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
+                    aria-label={`Ver la actividad de ${u.name}`}
+                  >
+                    <ScrollText className="w-5 h-5" />
+                  </Link>
+                  <button
+                    onClick={() => { setEditing(u); setShowModal(true); }}
+                    className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
+                    aria-label="Editar"
+                  >
+                    <Edit className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => { setSelectedUser(u); setShowPassModal(true); }}
+                    className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
+                    aria-label="Restablecer contraseña"
+                  >
+                    <Key className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleToggle(u)}
+                    className={`p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${u.is_active ? 'text-red-400' : 'text-green-500'}`}
+                    aria-label={u.is_active ? 'Deshabilitar' : 'Habilitar'}
+                  >
+                    {u.is_active ? <UserX className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card overflow-hidden hidden sm:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -352,7 +429,7 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
             id="sgc_access"
             checked={!!form.sgc_access}
             onChange={e => setForm({ ...form, sgc_access: e.target.checked })}
-            className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+            className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0 rounded accent-amber-500 cursor-pointer"
           />
           <label htmlFor="sgc_access" className="text-sm font-medium text-amber-800 dark:text-amber-300 cursor-pointer select-none">
             Acceso al SGC (Sistema de Gestión de Calidad)
@@ -367,7 +444,7 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
             id="pei_access"
             checked={!!form.pei_access}
             onChange={e => setForm({ ...form, pei_access: e.target.checked })}
-            className="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+            className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0 rounded accent-indigo-500 cursor-pointer"
           />
           <label htmlFor="pei_access" className="text-sm font-medium text-indigo-800 dark:text-indigo-300 cursor-pointer select-none">
             Acceso al Plan estratégico (tablero y catálogo)
@@ -375,7 +452,7 @@ export function UserForm({ user, units = [], onSave, onCancel }) {
         </div>
       )}
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
         <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
         <button type="submit" disabled={saving} className="btn-primary flex-1">
           {saving
@@ -413,7 +490,7 @@ function ResetPasswordForm({ user, onSave, onCancel }) {
         <input type="password" className="input" value={confirm}
           onChange={e => setConfirm(e.target.value)} required />
       </div>
-      <div className="flex gap-2 pt-2">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
         <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
         <button type="submit" className="btn-primary flex-1">Restablecer</button>
       </div>

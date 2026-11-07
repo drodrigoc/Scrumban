@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import {
   DndContext, DragOverlay, closestCenter,
-  PointerSensor, useSensor, useSensors,
+  MouseSensor, TouchSensor, useSensor, useSensors,
   useDroppable,
 } from '@dnd-kit/core';
 import {
@@ -13,8 +13,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { tasksAPI, projectsAPI, usersAPI } from '../services/api';
-import { Plus, Filter, Pencil, Trash2, Check, X, GripVertical, Lock, Archive } from 'lucide-react';
-import TaskCard from '../components/tasks/TaskCard';
+import { Plus, Filter, Pencil, Trash2, Check, X, GripVertical, Lock, Archive } from 'lucide-react';import TaskCard from '../components/tasks/TaskCard';
 import TaskModal from '../components/tasks/TaskModal';
 import Modal from '../components/common/Modal';
 import ViewNavBar from '../components/common/ViewNavBar';
@@ -64,7 +63,7 @@ const toApiColumns = (cols) =>
 // ---------------------------------------------------------------------------
 // DroppableColumn
 // ---------------------------------------------------------------------------
-function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRename, onDelete, onArchiveTask, footer }) {
+function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRename, onDelete, onArchiveTask, onMoveTask, footer }) {
   const isLocked = column.id === COMPLETED_ID;
 
   // Sortable handle for column reordering
@@ -115,7 +114,12 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
   };
 
   return (
-    <div ref={setSortableRef} style={colStyle} className="flex flex-col min-w-72 w-72 group/col">
+    <div
+      ref={setSortableRef}
+      style={colStyle}
+      data-snap=""
+      className="flex flex-col w-full min-w-0 shrink-0 snap-start sm:min-w-72 sm:w-72 group/col"
+    >
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 min-h-8">
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -126,7 +130,7 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
             <div
               {...colAttrs}
               {...colListeners}
-              className="cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 flex-shrink-0 p-0.5 -ml-0.5"
+              className="hidden sm:block cursor-grab active:cursor-grabbing text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 flex-shrink-0 p-0.5 -ml-0.5"
               title="Mover columna"
             >
               <GripVertical className="w-3.5 h-3.5" />
@@ -173,14 +177,16 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
                 <button
                   onClick={startEdit}
                   title="Renombrar columna"
-                  className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="Renombrar columna"
+                  className="p-2 sm:p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => onDelete(column.id)}
                   title="Eliminar columna"
-                  className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500"
+                  aria-label="Eliminar columna"
+                  className="p-2 sm:p-1 ml-1 sm:ml-0 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -190,7 +196,8 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
               <button
                 onClick={() => onAddTask(column.id)}
                 title="Agregar tarea"
-                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                aria-label="Agregar tarea"
+                className="p-2 sm:p-1 ml-1 sm:ml-0 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -215,6 +222,7 @@ function DroppableColumn({ column, tasks, activeId, onAddTask, onTaskClick, onRe
               task={task}
               onClick={() => onTaskClick(task)}
               onArchive={onArchiveTask}
+              onMove={onMoveTask}
             />
           ))}
           {tasks.length === 0 && (
@@ -255,10 +263,10 @@ function AddColumnPanel({ onAdd }) {
 
   if (!open) {
     return (
-      <div className="flex flex-col min-w-56 w-56 pt-0.5">
+      <div data-snap="" className="flex flex-col w-full min-w-0 shrink-0 snap-start sm:min-w-56 sm:w-56 pt-0.5">
         <button
           onClick={handleOpen}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-primary-400 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 transition-colors text-sm font-medium"
+          className="flex items-center justify-center sm:justify-start gap-2 px-3 py-3 sm:py-2 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-primary-400 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 transition-colors text-sm font-medium"
         >
           <Plus className="w-4 h-4" />
           Agregar columna
@@ -268,7 +276,7 @@ function AddColumnPanel({ onAdd }) {
   }
 
   return (
-    <div className="flex flex-col min-w-72 w-72">
+    <div data-snap="" className="flex flex-col w-full min-w-0 shrink-0 snap-start sm:min-w-72 sm:w-72">
       <div className="rounded-xl border-2 border-primary-400 bg-white dark:bg-gray-800 p-3 space-y-3 shadow-lg">
         <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Nueva columna</p>
         <input
@@ -288,7 +296,7 @@ function AddColumnPanel({ onAdd }) {
               key={opt.color}
               title={opt.label}
               onClick={() => setSelectedColor(opt)}
-              className={`w-5 h-5 rounded-full ${opt.color} transition-transform ${
+              className={`w-7 h-7 sm:w-5 sm:h-5 rounded-full ${opt.color} transition-transform ${
                 selectedColor.color === opt.color
                   ? 'scale-125 ring-2 ring-offset-1 ring-gray-500 dark:ring-gray-300'
                   : 'hover:scale-110'
@@ -316,7 +324,7 @@ function AddColumnPanel({ onAdd }) {
 // ---------------------------------------------------------------------------
 // SortableTaskCard
 // ---------------------------------------------------------------------------
-function SortableTaskCard({ task, onClick, onArchive }) {
+function SortableTaskCard({ task, onClick, onArchive, onMove }) {
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
@@ -335,6 +343,7 @@ function SortableTaskCard({ task, onClick, onArchive }) {
         task={task}
         onClick={onClick}
         onArchive={onArchive ? () => onArchive(task) : null}
+        onMove={onMove ? () => onMove(task) : null}
       />
     </div>
   );
@@ -433,9 +442,53 @@ export default function KanbanBoard() {
 
   const dragOriginRef = useRef(null);
 
+  // Ratón: arrastra tras mover 5 px. Táctil: mantener pulsado 250 ms, para que
+  // deslizar con el dedo siga desplazando la pantalla sin arrastrar tarjetas.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
   );
+
+  // Móvil: una columna a la vez, con pestañas que siguen al deslizamiento
+  const boardRef = useRef(null);
+  const tabsRef = useRef(null);
+  const [activeTab, setActiveTab] = useState(0);
+  const [moveTask, setMoveTask] = useState(null);
+
+  const scrollToColumn = useCallback((idx) => {
+    const box = boardRef.current;
+    const el = box?.querySelectorAll('[data-snap]')[idx];
+    if (!box || !el) return;
+    const left = el.getBoundingClientRect().left - box.getBoundingClientRect().left + box.scrollLeft;
+    box.scrollTo({ left, behavior: 'smooth' });
+    setActiveTab(idx);
+  }, []);
+
+  const scrollRaf = useRef(0);
+  const handleBoardScroll = useCallback(() => {
+    if (scrollRaf.current) return;
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = 0;
+      const box = boardRef.current;
+      if (!box || window.innerWidth >= 640) return;
+      const boxLeft = box.getBoundingClientRect().left;
+      let best = 0;
+      let bestDist = Infinity;
+      box.querySelectorAll('[data-snap]').forEach((el, i) => {
+        const d = Math.abs(el.getBoundingClientRect().left - boxLeft);
+        if (d < bestDist) { bestDist = d; best = i; }
+      });
+      setActiveTab(best);
+    });
+  }, []);
+
+  // La pestaña activa se mantiene a la vista en la fila de pestañas
+  useEffect(() => {
+    const bar = tabsRef.current;
+    const btn = bar?.children[activeTab];
+    if (!bar || !btn) return;
+    bar.scrollTo({ left: btn.offsetLeft - (bar.clientWidth - btn.offsetWidth) / 2, behavior: 'smooth' });
+  }, [activeTab]);
 
   // Columnas: ahora vienen de la BD y son las mismas para todo el equipo.
   // Si este navegador todavía tiene la configuración vieja en localStorage
@@ -734,6 +787,44 @@ export default function KanbanBoard() {
     }
   }, [activeTask]);
 
+  // Botón «Mover» (móvil): misma actualización que al soltar una tarjeta
+  // arrastrada (tasksAPI.update con status y, si es Completado, progress 100)
+  const handleMoveTask = useCallback(async (task, targetStatus) => {
+    setMoveTask(null);
+    const movedTask = tasksRef.current.find(t => t.id === task.id);
+    if (!movedTask || movedTask.status === targetStatus) return;
+    if (!columnsRef.current.some(c => c.id === targetStatus)) return;
+
+    const originalStatus = movedTask.status;
+    const movingToCompleted = targetStatus === COMPLETED_ID;
+    const updatePayload = {
+      status: targetStatus,
+      ...(movingToCompleted ? { progress: 100 } : {}),
+    };
+
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: targetStatus } : t));
+    try {
+      await tasksAPI.update(projectId, task.id, updatePayload);
+      setTasks(prev =>
+        prev.map(t => t.id === task.id
+          ? {
+              ...t,
+              ...(movingToCompleted
+                ? { progress: 100, completed_at: new Date().toISOString() }
+                : { completed_at: null }),
+            }
+          : t)
+      );
+    } catch {
+      setTasks(prev =>
+        prev.map(t => t.id === task.id ? { ...t, status: originalStatus } : t)
+      );
+      toast.error('Error al mover tarea');
+    }
+  }, [projectId]);
+
+  const closeMoveSheet = useCallback(() => setMoveTask(null), []);
+
   // --- Task CRUD ---
 
   const handleAddTask = (status) => {
@@ -802,12 +893,12 @@ export default function KanbanBoard() {
       <ViewNavBar projectName={project?.name} projectColor={project?.color} />
 
       {/* Filters */}
-      <div className="flex items-center justify-end mb-5 flex-wrap gap-2">
-        <Filter className="w-4 h-4 text-gray-400" />
+      <div className="grid grid-cols-2 gap-2 mb-4 sm:mb-5 sm:flex sm:items-center sm:justify-end sm:flex-wrap">
+        <Filter className="hidden sm:block w-4 h-4 text-gray-400" />
         <select
           value={filterAssignee}
           onChange={e => setFilterAssignee(e.target.value)}
-          className="input py-1.5 w-auto text-sm"
+          className="input py-2 sm:py-1.5 w-full min-w-0 sm:w-auto text-sm"
         >
           <option value="">Todos los responsables</option>
           {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -815,7 +906,7 @@ export default function KanbanBoard() {
         <select
           value={filterPriority}
           onChange={e => setFilterPriority(e.target.value)}
-          className="input py-1.5 w-auto text-sm"
+          className="input py-2 sm:py-1.5 w-full min-w-0 sm:w-auto text-sm"
         >
           <option value="">Todas las prioridades</option>
           <option value="low">Baja</option>
@@ -824,14 +915,60 @@ export default function KanbanBoard() {
           <option value="critical">Crítica</option>
         </select>
         {canEdit && (
-          <button onClick={() => handleAddTask('pending')} className="btn-primary text-sm py-1.5">
+          <button
+            onClick={() => handleAddTask('pending')}
+            className="btn-primary text-sm py-2.5 sm:py-1.5 col-span-2 sm:col-auto w-full sm:w-auto justify-center"
+          >
             <Plus className="w-4 h-4" /> Nueva Tarea
           </button>
         )}
       </div>
 
+      {/* Pestañas de estados (solo móvil) */}
+      <div
+        ref={tabsRef}
+        className="sm:hidden relative flex gap-2 overflow-x-auto -mx-4 px-4 pb-2 mb-1 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
+      >
+        {columns.map((col, i) => (
+          <button
+            key={col.id}
+            type="button"
+            onClick={() => scrollToColumn(i)}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-medium transition-colors ${
+              activeTab === i
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${col.color}`} />
+            {col.label}
+            <span className={`text-xs px-1.5 rounded-full ${
+              activeTab === i ? 'bg-white/25' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+            }`}>
+              {getColumnTasks(col.id).length}
+            </span>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => scrollToColumn(columns.length)}
+          aria-label="Agregar columna"
+          className={`flex-shrink-0 flex items-center px-3 py-2 rounded-full border border-dashed text-sm ${
+            activeTab === columns.length
+              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+              : 'border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500'
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* Board */}
-      <div className="flex-1 overflow-x-auto pb-4">
+      <div
+        ref={boardRef}
+        onScroll={handleBoardScroll}
+        className={`flex-1 overflow-x-auto pb-4 ${activeTask ? 'snap-none' : 'snap-x snap-mandatory'} sm:snap-none max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden`}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -841,7 +978,7 @@ export default function KanbanBoard() {
           onDragCancel={handleDragCancel}
         >
           <SortableContext items={columnSortIds} strategy={horizontalListSortingStrategy}>
-            <div className="flex gap-4 min-h-full h-full items-start">
+            <div className="flex gap-3 sm:gap-4 min-h-full h-full items-start">
               {columns.map(col => (
                 <DroppableColumn
                   key={col.id}
@@ -853,6 +990,7 @@ export default function KanbanBoard() {
                   onRename={handleRenameColumn}
                   onDelete={handleDeleteColumn}
                   onArchiveTask={canEdit && col.id === COMPLETED_ID ? handleArchiveTask : null}
+                  onMoveTask={canEdit ? setMoveTask : null}
                   footer={col.id === COMPLETED_ID ? (
                     <CompletedFooter
                       projectId={projectId}
@@ -890,6 +1028,41 @@ export default function KanbanBoard() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {moveTask && (
+        <Modal
+          title={`Mover "${moveTask.title.length > 40 ? moveTask.title.slice(0, 40) + '…' : moveTask.title}"`}
+          onClose={closeMoveSheet}
+          size="sm"
+        >
+          <div className="space-y-2">
+            {columns.map(col => {
+              const current = tasks.find(t => t.id === moveTask.id)?.status === col.id;
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  disabled={current}
+                  onClick={() => handleMoveTask(moveTask, col.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left text-sm font-medium transition-colors ${
+                    current
+                      ? 'border-primary-400 bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-800'
+                  }`}
+                >
+                  <span className={`w-3 h-3 rounded-full flex-shrink-0 ${col.color}`} />
+                  <span className="flex-1 min-w-0 truncate">{col.label}</span>
+                  {current && (
+                    <span className="flex items-center gap-1 text-xs flex-shrink-0">
+                      <Check className="w-4 h-4" /> Actual
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </Modal>
+      )}
 
       {showTaskModal && (
         <Modal

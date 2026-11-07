@@ -203,7 +203,7 @@ export default function AlineacionPanel({ projectId, canEdit, canPlanificar = ca
     <div className="card p-5 space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-2">
         <Encabezado plan={plan} />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {vinculos.length > 0 && (
             <span className={`badge ${cumplidas === vinculos.length
               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -212,7 +212,7 @@ export default function AlineacionPanel({ projectId, canEdit, canPlanificar = ca
             </span>
           )}
           {canPlanificar && (
-            <button onClick={abrirVincular} className="btn-secondary text-xs py-1.5 px-3">
+            <button onClick={abrirVincular} className="btn-secondary text-xs py-2.5 sm:py-1.5 px-3">
               <Plus className="w-3.5 h-3.5" /> Vincular actividad
             </button>
           )}
@@ -344,7 +344,7 @@ function Encabezado({ plan }) {
 function MenuActividad({ cumplido, onEditar, onReabrir, onQuitar }) {
   const [abierto, setAbierto] = useState(false);
   const elegir = (accion) => () => { setAbierto(false); accion(); };
-  const opcion = 'w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700';
+  const opcion = 'w-full flex items-center gap-3 sm:gap-2 px-4 sm:px-3 py-3 sm:py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700';
 
   return (
     <div className="relative">
@@ -354,16 +354,19 @@ function MenuActividad({ cumplido, onEditar, onReabrir, onQuitar }) {
         title="Más acciones"
         aria-haspopup="menu"
         aria-expanded={abierto}
-        className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700"
+        className="p-2.5 sm:p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-700"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
       {abierto && (
         <>
           {/* Clic fuera: cierra el menú */}
-          <div className="fixed inset-0 z-10" onClick={() => setAbierto(false)} />
+          <div className="fixed inset-0 z-40 bg-black/30 sm:bg-transparent sm:z-10" onClick={() => setAbierto(false)} />
+          {/* Móvil: hoja inferior a todo el ancho; escritorio: menú junto al botón */}
           <div role="menu"
-            className="absolute right-0 top-full mt-1 z-20 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1">
+            className="fixed inset-x-0 bottom-0 z-50 pb-safe rounded-t-2xl
+                       sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-1 sm:z-20 sm:w-52 sm:pb-0 sm:rounded-lg
+                       bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg py-2 sm:py-1">
             <button role="menuitem" onClick={elegir(onEditar)} className={`${opcion} text-gray-700 dark:text-gray-200`}>
               <Pencil className="w-3.5 h-3.5" /> {cumplido ? 'Editar evidencia' : 'Agregar evidencia'}
             </button>
@@ -404,13 +407,13 @@ function Actividad({
     <div className={`rounded-lg border p-3 ${v.cumplido
       ? 'border-green-200 dark:border-green-800/60 bg-green-50/50 dark:bg-green-900/10'
       : 'border-gray-200 dark:border-gray-700'}`}>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap sm:flex-nowrap items-start gap-3">
         {v.cumplido
           ? <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
           : <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0 mt-0.5" />}
 
-        <div className="flex-1 min-w-0 space-y-1">
-          <p className="text-sm text-gray-800 dark:text-gray-200">
+        <div className="grow basis-[calc(100%-2rem)] sm:basis-0 min-w-0 space-y-1">
+          <p className="text-sm text-gray-800 dark:text-gray-200 break-words">
             <span className="font-semibold tabular-nums">{v.actividad_numero}.</span> {v.actividad_nombre}
           </p>
           <dl className="text-xs text-gray-500 dark:text-gray-400 grid sm:grid-cols-2 gap-x-4 gap-y-0.5">
@@ -471,11 +474,11 @@ function Actividad({
               {Object.values(erroresForm).filter(Boolean).map(m => (
                 <p key={m} className="text-xs text-red-600 dark:text-red-400">{m}</p>
               ))}
-              <div className="flex gap-2 justify-end">
-                <button type="button" onClick={() => setEditando(null)} className="btn-secondary text-xs py-1.5 px-3">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+                <button type="button" onClick={() => setEditando(null)} className="btn-secondary text-xs py-2.5 sm:py-1.5 px-3 w-full sm:w-auto justify-center">
                   Cancelar
                 </button>
-                <button type="button" onClick={onGuardar} disabled={guardando} className="btn-primary text-xs py-1.5 px-3">
+                <button type="button" onClick={onGuardar} disabled={guardando} className="btn-primary text-xs py-2.5 sm:py-1.5 px-3 w-full sm:w-auto justify-center">
                   {guardando
                     ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : (editando.marcar ? 'Marcar cumplida' : 'Guardar')}
@@ -486,10 +489,10 @@ function Actividad({
         </div>
 
         {canEdit && !editando && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end pl-8 sm:pl-0">
             {!v.cumplido && (
               <button onClick={onMarcar}
-                className="text-xs font-medium text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md px-2 py-1">
+                className="text-xs font-medium text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md px-3 sm:px-2 py-2 sm:py-1">
                 Marcar cumplida
               </button>
             )}

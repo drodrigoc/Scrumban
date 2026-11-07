@@ -140,9 +140,9 @@ export default function ProjectForm({ project, onSave, onCancel, soloEstado = fa
             <option value="cancelled">Cancelado</option>
           </select>
         </div>
-        <div className="flex gap-2 pt-2">
-          <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
-          <button type="submit" disabled={guardando} className="btn-primary flex-1">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+          <button type="button" className="btn-secondary w-full sm:w-auto sm:flex-1" onClick={onCancel}>Cancelar</button>
+          <button type="submit" disabled={guardando} className="btn-primary w-full sm:w-auto sm:flex-1">
             {guardando
               ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
               : 'Guardar estado'}
@@ -240,7 +240,8 @@ export default function ProjectForm({ project, onSave, onCancel, soloEstado = fa
                   type="button"
                   onClick={() => quitarObjetivo(i)}
                   title="Quitar este objetivo"
-                  className="p-1.5 mt-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  aria-label="Quitar este objetivo"
+                  className="p-2.5 sm:p-1.5 mt-0 sm:mt-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -251,14 +252,14 @@ export default function ProjectForm({ project, onSave, onCancel, soloEstado = fa
         <button
           type="button"
           onClick={agregarObjetivo}
-          className="mt-2 ml-8 text-sm text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1"
+          className="mt-2 ml-8 py-2 sm:py-0 text-sm text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1"
         >
           <Plus className="w-3.5 h-3.5" /> Agregar objetivo
         </button>
       </div>
 
       <div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="label">Fecha inicio</label>
             <input
@@ -286,7 +287,7 @@ export default function ProjectForm({ project, onSave, onCancel, soloEstado = fa
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="label">Estado</label>
           <select className="input" value={form.status} onChange={e => cambiar('status', e.target.value)}>
@@ -305,7 +306,7 @@ export default function ProjectForm({ project, onSave, onCancel, soloEstado = fa
                 type="button"
                 onClick={() => cambiar('color', c)}
                 title="Color del proyecto"
-                className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${
+                className={`w-8 h-8 sm:w-6 sm:h-6 rounded-full transition-transform hover:scale-110 ${
                   form.color === c ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-offset-gray-900 scale-110' : ''
                 }`}
                 style={{ backgroundColor: c }}
@@ -315,9 +316,9 @@ export default function ProjectForm({ project, onSave, onCancel, soloEstado = fa
         </div>
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <button type="button" className="btn-secondary flex-1" onClick={onCancel}>Cancelar</button>
-        <button type="submit" disabled={guardando} className="btn-primary flex-1">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+        <button type="button" className="btn-secondary w-full sm:w-auto sm:flex-1" onClick={onCancel}>Cancelar</button>
+        <button type="submit" disabled={guardando} className="btn-primary w-full sm:w-auto sm:flex-1">
           {guardando
             ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
             : (project ? 'Actualizar' : 'Crear Proyecto')}

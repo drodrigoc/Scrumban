@@ -60,7 +60,7 @@ function StatusSelect({ value, onChange, columns }) {
       value={value}
       onChange={e => { e.stopPropagation(); onChange(e.target.value); }}
       onClick={e => e.stopPropagation()}
-      className={`text-xs font-medium rounded-full px-2 py-0.5 border-0 outline-none cursor-pointer appearance-none
+      className={`text-xs font-medium rounded-full px-3 py-1.5 sm:px-2 sm:py-0.5 border-0 outline-none cursor-pointer appearance-none
                   focus:ring-2 focus:ring-primary-400 ${colorClass}`}
     >
       {columns.map(c => (
@@ -246,36 +246,38 @@ export default function BacklogView() {
 
       {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <div className="flex items-center gap-2 flex-wrap flex-1">
+        <div className="flex items-center gap-2 flex-wrap flex-1 w-full sm:w-auto">
           {/* Search */}
-          <div className="relative min-w-52">
+          <div className="relative w-full sm:w-auto sm:min-w-52">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text" placeholder="Buscar tareas..."
               value={search} onChange={e => setSearch(e.target.value)}
-              className="input pl-8 py-1.5 text-sm"
+              className="input pl-8 py-2.5 sm:py-1.5 text-sm"
             />
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-1.5 text-gray-400">
+          <div className="hidden sm:flex items-center gap-1.5 text-gray-400">
             <Filter className="w-3.5 h-3.5" />
           </div>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input py-1.5 w-auto text-sm">
+          <div className="grid grid-cols-2 gap-2 w-full sm:contents">
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input py-2.5 sm:py-1.5 w-full sm:w-auto text-sm">
             <option value="all">Todos los estados</option>
             {kanbanColumns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
-          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="input py-1.5 w-auto text-sm">
+          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="input py-2.5 sm:py-1.5 w-full sm:w-auto text-sm">
             <option value="all">Todas las prioridades</option>
             {Object.entries(priorityCfg).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
-          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="input py-1.5 w-auto text-sm">
+          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="input py-2.5 sm:py-1.5 w-full sm:w-auto col-span-2 sm:col-span-1 text-sm">
             <option value="all">Todos los responsables</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
           {canEdit && someSelected && (
             <button onClick={handleDeleteSelected}
               className="btn-danger text-xs py-1.5 px-3 flex items-center gap-1">
@@ -289,7 +291,7 @@ export default function BacklogView() {
           {canEdit && (
             <button
               onClick={() => { setSelectedTask(null); setShowModal(true); }}
-              className="btn-primary text-sm py-1.5"
+              className="btn-primary text-sm py-2.5 sm:py-1.5"
             >
               <Plus className="w-4 h-4" /> Nueva Tarea
             </button>
@@ -299,7 +301,61 @@ export default function BacklogView() {
 
       {/* Table */}
       <div className="card overflow-hidden flex-1">
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
+        {/* Móvil: lista de tarjetas (al tocarla se abre la tarea, igual que la fila) */}
+        <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-800">
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 px-4 text-center text-gray-400 dark:text-gray-500">
+              <CheckSquare className="w-10 h-10 opacity-30" />
+              <p className="font-medium">No hay tareas</p>
+              {canEdit && <p className="text-xs">Toca "Nueva Tarea" para comenzar</p>}
+            </div>
+          ) : filtered.map(task => {
+            const vencida = task.due_date && task.status !== 'completed' && estaVencida(task.due_date);
+            const faltan = task.due_date ? diasParaVencer(task.due_date) : null;
+            const porVencer = faltan !== null && faltan >= 0 && faltan <= 3 && task.status !== 'completed';
+            const pri = priorityCfg[task.priority] || priorityCfg.medium;
+            return (
+              <div key={task.id}
+                onClick={() => handleOpenTask(task)}
+                className={`p-3.5 space-y-2 cursor-pointer active:bg-gray-50 dark:active:bg-gray-800/60 ${vencida ? 'bg-red-50/30 dark:bg-red-950/10' : ''}`}
+              >
+                <div className="flex items-start gap-2">
+                  <div className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${pri.dot}`} />
+                  <p className={`flex-1 min-w-0 text-sm font-medium break-words ${
+                    vencida ? 'text-red-700 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'
+                  }`}>
+                    {task.title}
+                  </p>
+                  {vencida && <AlertTriangle className="w-4 h-4 mt-0.5 text-red-500 flex-shrink-0" />}
+                  {porVencer && !vencida && <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-400 flex-shrink-0" />}
+                </div>
+                <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 pl-4">
+                  <span onClick={e => e.stopPropagation()}>
+                    <StatusSelect value={task.status} onChange={val => handleStatusChange(task.id, val)} columns={kanbanColumns} />
+                  </span>
+                  <span className={`badge ${pri.badge}`}>{pri.label}</span>
+                  {task.due_date && (
+                    <span className={`text-xs flex items-center gap-1 font-medium ${
+                      vencida ? 'text-red-500 dark:text-red-400'
+                      : porVencer ? 'text-amber-500 dark:text-amber-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      <Calendar className="w-3 h-3" />
+                      {format(diaLocal(task.due_date), 'dd MMM', { locale: es })}
+                      {faltan === 0 && ' (hoy)'}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 min-w-0">
+                    <User className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{task.assignee_name ? task.assignee_name.split(' ')[0] : 'Sin asignar'}</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -503,12 +559,12 @@ export default function BacklogView() {
 
         {/* Footer summary */}
         <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700
-                        bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-between">
+                        bg-gray-50/50 dark:bg-gray-800/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {filtered.length} de {tasks.length} tareas
             {someSelected && ` · ${selected.size} seleccionadas`}
           </span>
-          <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400 dark:text-gray-500">
             {Object.entries(statusCfg).map(([k, v]) => {
               const count = tasks.filter(t => t.status === k).length;
               return count > 0 ? (

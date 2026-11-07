@@ -159,7 +159,7 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
 
   return (
     <div className="card p-5 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Layers className="w-4 h-4 text-primary-500" />
@@ -176,13 +176,13 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap [&>*]:flex-1 sm:[&>*]:flex-none">
           {phases.length > 0 && (
             <select
               value={escala}
               onChange={e => setEscala(e.target.value)}
               title="Escala del cronograma"
-              className="input py-1.5 w-auto text-xs"
+              className="input py-2 sm:py-1.5 w-full sm:w-auto text-xs"
             >
               {ESCALAS.map(e => (
                 <option key={e.value} value={e.value}>{e.label}</option>
@@ -193,11 +193,11 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
           {canEdit && !showForm && (
             <>
               {phases.length === 0 && (
-                <button onClick={handleUsarPlantilla} disabled={saving} className="btn-secondary text-xs py-1.5 px-3">
+                <button onClick={handleUsarPlantilla} disabled={saving} className="btn-secondary text-xs py-2.5 sm:py-1.5 px-3 justify-center">
                   <Sparkles className="w-3.5 h-3.5" /> Usar plantilla
                 </button>
               )}
-              <button onClick={openNew} className="btn-secondary text-xs py-1.5 px-3">
+              <button onClick={openNew} className="btn-secondary text-xs py-2.5 sm:py-1.5 px-3 justify-center">
                 <Plus className="w-3.5 h-3.5" /> Nueva fase
               </button>
             </>
@@ -230,7 +230,7 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Inicio</label>
               <input
@@ -257,7 +257,7 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
                   key={c} type="button"
                   onClick={() => setForm({ ...form, color: c })}
                   style={{ backgroundColor: c }}
-                  className={`w-6 h-6 rounded-full transition-transform ${
+                  className={`w-8 h-8 sm:w-6 sm:h-6 rounded-full transition-transform ${
                     form.color === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-110'
                   }`}
                 />
@@ -265,9 +265,9 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
             </div>
           </div>
 
-          <div className="flex gap-2 justify-end">
-            <button onClick={closeForm} className="btn-secondary text-sm py-1.5 px-4">Cancelar</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-1.5 px-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <button onClick={closeForm} className="btn-secondary text-sm py-2.5 sm:py-1.5 px-4 w-full sm:w-auto">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm py-2.5 sm:py-1.5 px-4 w-full sm:w-auto">
               {saving
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 : (editingId ? 'Guardar cambios' : 'Agregar fase')
@@ -287,6 +287,9 @@ export default function PhasesPanel({ projectId, canEdit, projectStart, projectE
         // Misma barra de tiempo que la vista Cronograma, ajustada a las
         // fechas de las fases para que se vea el proyecto completo
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <p className="sm:hidden text-xs text-gray-400 dark:text-gray-500 px-3 py-1.5 border-b border-gray-100 dark:border-gray-700">
+            Desliza hacia los lados para ver todo el cronograma.
+          </p>
           <div className="overflow-x-auto">
             <div className="min-w-[1020px]">
               <PhasesTimeline

@@ -32,7 +32,7 @@ export default function Sidebar({ open, onClose }) {
   const hasPEIAccess   = !!user?.pei_access && !isAdminVisible && !isSuperViewer;
 
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+    `flex items-center gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors ${
       isActive
         ? 'bg-primary-600 text-white dark:bg-primary-500'
         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100'
@@ -41,11 +41,11 @@ export default function Sidebar({ open, onClose }) {
   return (
     <>
       {open && (
-        <div className="fixed inset-0 bg-black/30 z-20 lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />
       )}
 
       <aside className={`
-        fixed lg:relative z-30 flex flex-col h-full w-64
+        fixed lg:relative z-40 lg:z-30 flex flex-col h-full w-72 max-w-[85vw] lg:w-64 pt-safe
         bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700
         transition-transform duration-200 ease-in-out
         ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:overflow-hidden'}
@@ -53,7 +53,7 @@ export default function Sidebar({ open, onClose }) {
         {/* Logo */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
           <img src={logo} alt="USO Projects" className="w-full h-auto object-contain dark:brightness-90 max-h-16" />
-          <button onClick={onClose} className="lg:hidden p-1 ml-2 flex-shrink-0 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400">
+          <button onClick={onClose} aria-label="Cerrar menú" className="lg:hidden p-2 ml-2 flex-shrink-0 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -140,7 +140,7 @@ export default function Sidebar({ open, onClose }) {
         </nav>
 
         {/* User info */}
-        <div className="px-3 py-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="px-3 py-4 border-t border-gray-100 dark:border-gray-700 pb-safe">
           <div className="flex items-center gap-3 mb-3 px-2">
             <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 font-semibold text-sm flex-shrink-0">
               {user?.name?.charAt(0).toUpperCase()}
